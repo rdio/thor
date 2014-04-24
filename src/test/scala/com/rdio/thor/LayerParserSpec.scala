@@ -1,6 +1,6 @@
 package com.rdio.thor
 
-import java.awt.Color
+import java.awt.{Color, Font}
 
 class FilterParserSpec extends BaseSpec {
 
@@ -42,6 +42,28 @@ class FilterParserSpec extends BaseSpec {
 
   "Parser" should "be able to parse placeholders" in {
     parser.parseAll(parser.placeholder, "$1").get should be (IndexNode(1))
+  }
+
+  "Parser" should "be able to parse font styles" in {
+    parser.parseAll(parser.fontStyle, "bold").get should be (1)
+    parser.parseAll(parser.fontStyle, "italic").get should be (2)
+    parser.parseAll(parser.fontStyle, "normal").get should be (0)
+  }
+
+  "Parser" should "be able to parse fonts" in {
+    parser.parseAll(parser.font, "bold italic bold bold italic 16px \"Helvetica\"").get should be (FontNode("Helvetica", 16, 3))
+    parser.parseAll(parser.font, "bold italic 16px \"Helvetica\"").get should be (FontNode("Helvetica", 16, 3))
+    parser.parseAll(parser.font, "bold 16px \"Helvetica\"").get should be (FontNode("Helvetica", 16, 1))
+    parser.parseAll(parser.font, "italic 16px \"Helvetica\"").get should be (FontNode("Helvetica", 16, 2))
+    parser.parseAll(parser.font, "16px \"Helvetica\"").get should be (FontNode("Helvetica", 16, 0))
+    parser.parseAll(parser.font, "\"Helvetica\"").get should be (FontNode("Helvetica", 12, 0))
+    parser.parseAll(parser.font, "bold \"Helvetica\"").get should be (FontNode("Helvetica", 12, 1))
+  }
+
+  "Parser" should "be able to parse text" in {
+    parser.parseAll(parser.text, "text(\"Hello world!\", bold 16px \"Helvetica\", rgb(0, 0, 0))").get should be {
+      TextNode("Hello world!", FontNode("Helvetica", 16, 1), Color.black)
+    }
   }
 
   "Parser" should "be able to parse filters" in {

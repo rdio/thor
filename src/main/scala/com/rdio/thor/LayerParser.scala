@@ -1,11 +1,13 @@
 package com.rdio.thor
 
-import java.awt.Color
+import java.awt.{Color, Font}
 
 import scala.math
 import scala.util.parsing.combinator._
 
 case class ColorStop(color: Color, stop: Float)
+
+case class FontNode(family: String = "Helvetica", size: Int = 12, style: Int = 0)
 
 trait ImageNode{}
 case class EmptyNode() extends ImageNode
@@ -18,22 +20,24 @@ case class NoopNode() extends FilterNode
 case class LinearGradientNode(degrees: Float, colors: List[Color], stops: List[Float]) extends FilterNode
 case class BlurNode() extends FilterNode
 case class BoxBlurNode(hRadius: Int, vRadius: Int) extends FilterNode
+case class BoxBlurPercentNode(hRadius: Float, vRadius: Float) extends FilterNode
 case class ColorizeNode(color: Color) extends FilterNode
 case class ScaleNode(percentage: Float) extends FilterNode
 case class ZoomNode(percentage: Float) extends FilterNode
 case class ScaleToNode(width: Int, height: Int) extends FilterNode
+case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode
 case class GridNode(paths: List[ImageNode]) extends FilterNode
 case class PadNode(padding: Int) extends FilterNode
-case class ConstrainNode(constraints: List[String]) extends FilterNode
-case class CompositeNode(image: ImageNode, composites: List[String]) extends FilterNode
+case class PadPercentNode(padding: Float) extends FilterNode
 case class RoundCornersNode(radius: Int) extends FilterNode
+case class RoundCornersPercentNode(radius: Float) extends FilterNode
 case class OverlayNode(overlay: ImageNode) extends FilterNode
 case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode
 case class CoverNode(width: Int, height: Int) extends FilterNode
 
 case class LayerNode(path: ImageNode, filter: FilterNode)
 
-class LayerParser(width: Int, height: Int) extends RegexParsers {
+class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
 
   // number - matches an integer or floating point number
   def number: Parser[Float] = """\d+(\.\d+)?""".r ^^ (_.toFloat)
@@ -55,13 +59,37 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
   def pixels: Parser[Int] = integer <~ "px"
 
   // path - matches a valid url path
-  def path: Parser[PathNode] = """[\w\-\/\.]+""".r ^^ {
+  def path: Parser[PathNode] = """[\w\-\/\.%]+""".r ^^ {
     case path => PathNode(path)
   }
 
   // empty - matches an empty image placeholder
   def empty: Parser[EmptyNode] = "_" ^^ {
     case _ => EmptyNode()
+  }
+
+  def fontStyle: Parser[Int] = """bold|italic|normal""".r ^^ {
+    case "normal" => 0
+    case "bold" => 1
+    case "italic" => 2
+  }
+
+  def fontStyles: Parser[Int] = rep1(fontStyle) ^^ { styles =>
+    // Sum the styles to a maximum of 3
+    math.min(styles.reduceLeft((styles, style) => styles + style), 3)
+  }
+
+  def string: Parser[String] = stringLiteral ^^ { string =>
+    string.stripPrefix("\"").stripSuffix("\"")
+  }
+
+  // font - matches a font
+  def font: Parser[FontNode] = (fontStyles?) ~ (pixels?) ~ string ^^ {
+    case maybeStyle ~ maybeSize ~ family => {
+      val style: Int = maybeStyle.getOrElse(Font.PLAIN)
+      val size: Int = maybeSize.getOrElse(12)
+      FontNode(family, size, style)
+    }
   }
 
   // placeholder - matches an image placeholder
@@ -103,16 +131,6 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
     case color ~ number => ColorStop(color, number)
   }
 
-  // composites unit
-  def composites: Parser[String] =
-    "average" | "blue" | "color" | "colorburn" | "colordodge" | "diff" | "green" |
-    "grow" | "hue" | "hard" | "heat" | "lighten" | "negation" | "luminosity" |
-    "multiply" | "negation" | "normal" | "overlay" | "red" | "reflect" | "saturation" |
-    "screen" | "subtract"
-
-  // constraints unit
-  def constraints: Parser[String] = "left" | "right" | "top" | "bottom"
-
   // linear gradient filter
   def linear: Parser[LinearGradientNode] = "linear(" ~> degrees ~ "," ~ rep1sep(colorStop, ",") <~ ")" ^? {
     case degrees ~ _ ~ colorStops if colorStops.length > 1 => {
@@ -138,10 +156,10 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
   // box blur filter
   def boxblur: Parser[BoxBlurNode] = "boxblur(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
     case hRadius ~ _ ~ vRadius => BoxBlurNode(hRadius, vRadius)
-  } | "boxblur(" ~> percent ~ "," ~ percent <~ ")" ^^ {
-    case hPercent ~ _ ~ vPercent => {
-      BoxBlurNode((hPercent * width.toFloat).toInt, (vPercent * height.toFloat).toInt)
-    }
+  }
+
+  def boxblurpercent: Parser[BoxBlurPercentNode] = "boxblur(" ~> percent ~ "," ~ percent <~ ")" ^^ {
+    case hPercent ~ _ ~ vPercent => BoxBlurPercentNode(hPercent, vPercent)
   }
 
   // colorize filter
@@ -152,11 +170,6 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
   // zoom filter
   def zoom: Parser[ZoomNode] = "zoom(" ~> percent <~ ")" ^^ {
     case percentage => ZoomNode(percentage)
-  }
-
-  // constrain filter
-  def constrain: Parser[ConstrainNode] = "constrain(" ~> rep1sep(constraints, ",") <~ ")" ^^ {
-    case constraints => ConstrainNode(constraints)
   }
 
   // scale filter
@@ -174,11 +187,18 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
     case paths => GridNode(paths)
   }
 
+  // text filter
+  def text: Parser[TextNode] = "text(" ~> string ~ "," ~ font ~ "," ~ color <~ ")" ^^ {
+    case text ~ _ ~ font ~ _ ~ color => TextNode(text, font, color)
+  }
+
   // round filter
   def round: Parser[RoundCornersNode] = "round(" ~> pixels <~ ")" ^^ {
     case radius => RoundCornersNode(radius)
-  } | "round(" ~> percent <~ ")" ^^ {
-    case percent => RoundCornersNode((percent * math.max(width, height).toFloat).toInt)
+  }
+
+  def roundpercent: Parser[RoundCornersPercentNode] = "round(" ~> percent <~ ")" ^^ {
+    case percent => RoundCornersPercentNode(percent)
   }
 
   // mask filter
@@ -194,13 +214,10 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
   // pad filter
   def pad: Parser[PadNode] = "pad(" ~> pixels <~ ")" ^^ {
     case padding => PadNode(padding)
-  } | "pad(" ~> percent <~ ")" ^^ {
-    case percent => PadNode((percent * math.max(width, height).toFloat).toInt)
   }
 
-  // composite filter
-  def composite: Parser[CompositeNode] = "composite(" ~> source ~ "," ~ rep1sep(composites, ",") <~ ")" ^^ {
-    case source ~ _ ~ composites => CompositeNode(source, composites)
+  def padpercent: Parser[PadPercentNode] = "pad(" ~> percent <~ ")" ^^ {
+    case percent => PadPercentNode(percent)
   }
 
   // cover filter
@@ -209,7 +226,11 @@ class LayerParser(width: Int, height: Int) extends RegexParsers {
   }
 
   // all filters
-  def filters: Parser[FilterNode] = linear | boxblur | blur | scaleto | zoom | scale | grid | round | mask | colorize | overlay | composite | constrain | pad
+  def filters: Parser[FilterNode] =
+    text | linear | boxblur | boxblurpercent |
+    blur | scaleto | zoom | scale |
+    grid | round | roundpercent | mask |
+    colorize | overlay | pad | padpercent
 
   // layer - matches a single layer
   def layer: Parser[LayerNode] =

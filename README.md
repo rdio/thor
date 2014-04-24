@@ -19,7 +19,7 @@ Querystring Params
 - `w` - width of the final image
 - `h` - height of the final image
 - `c` - compression quality to apply to jpeg image results (0-100)
-  - NOTE: File format is chosen automatically based on whether or not a filter or layer utilizes transparency.
+- `f` - file format; one of: `png` or `jpeg` (default)
 - `l` - `<layer>[; <layer>]+` - a sequence of one or more layers separated by a semi-colon: `;`
   - layer - `<source>[:<filter>]|<filter>` - a layer consists of a single image source and an optional filter separated by a colon: `:`, or a single filter without a source
     - source - `<url>|$<index>|_` - either a relative url path or a layer reference or an empty layer
@@ -29,13 +29,18 @@ Querystring Params
     - filter - `<filter-name>([args])` - filter to apply to the current layer or if no source was provided, the previous layer
       - linear gradient - `linear(<angle>, <color-stop>, <color-stop> [, <color-stop>]+)` - applies a linear gradient over the layer at `<angle>` degrees with _at least_ two color stops
         - color stop - `<rgb|rgba> <percentage>%` - supports either rgb or rgba colors
+        - color - `rgb(<r>, <g>, <b>)|rgba(<r>, <g>, <b>, <a>)` — specifies a color with values between 0.0-1.0
       - blur - `blur()` - blurs the image using a 3x3 convolution kernel
-      - boxblur - `blur(<horizontal-radius-pixels>, <vertical-radius-pixels>)` - applies a box blur to the image by `radius-pixels`
+      - text - `text("<text>", font, <rgb|rgba>)` - draws the specified text over the center of the image
+        - text - text string; must be wrapped in double-quotes
+        - font - `<normal|bold|italic> <font-size>px "<name-string>"` — font declaration
+        - NOTE: The font must be installed locally or copied as a .ttf into the resources folder
+      - boxblur - `boxblur(<horizontal-radius>px, <vertical-radius>px)|boxblur(<horizontal-radius>%, <vertical-radius>%)` - applies a box blur to the image by `horizontal-radius` and `vertical-radius`
       - scale - `scale(<percent>%)` - resizes the image by `percent`
       - scaleto - `scaleto(<width-pixels>, <height-pixels>)` - resizes the image to the specified dimensions
       - grid - `grid(<source>[, <source>]+)` - forms a grid from the list of source images (original layer included in the grid)
-      - round - `round(<radius-pixels>px)` - rounds the corners of the layer by `radius-pixels`
-      - pad - `pad(<padding-pixels>)` - applies padding around the image by `padding-pixels`
+      - round - `round(<radius-pixels>px|<radius-percent>%)` - rounds the corners of the layer by `radius-pixels`
+      - pad - `pad(<padding-pixels>px|<padding-percent>%)` - applies padding around the image by `padding-pixels`
       - colorize - `colorize(<color>)` - overlays the specified `color` over the image
       - overlay - `overlay(<source>)` - overlays the specified `source` over the image
       - mask - `mask(<overlay-source>, <mask-source>)` - blends between the layer and `overlay-source` using `mask-source` as a guide
