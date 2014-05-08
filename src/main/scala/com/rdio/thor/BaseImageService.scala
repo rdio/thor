@@ -70,7 +70,7 @@ abstract class BaseImageService(conf: Config) extends Service[Request, Response]
   def requestImage(url: String): Future[Option[Image]] = {
     val req = Request("/" + url)
     req.userAgent = "Thor-Imageserver"
-    req.host = mediaHost
+    req.host = s"$mediaHost:$mediaPort"
     req.accept = "image/*"
     imageClient(req) map {
       res => res.status match {
