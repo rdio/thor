@@ -147,7 +147,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
       case OverlayNode(overlay) => {
         tryGetImage(overlay, imageMap, completedLayers, width, height) match {
           case Some(overlayImage) => {
-            Some(image.filter(OverlayFilter(overlayImage.scaleTo(width, height, ScaleMethod.Bicubic))))
+            Some(image.filter(OverlayFilter(overlayImage.scaleTo(image.width, image.height, ScaleMethod.Bicubic))))
           }
           case _ => {
             log.error(s"Failed to apply overlay")
