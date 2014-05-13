@@ -147,7 +147,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
       case OverlayNode(overlay) => {
         tryGetImage(overlay, imageMap, completedLayers, width, height) match {
           case Some(overlayImage) => {
-            Some(image.filter(OverlayFilter(overlayImage.scaleTo(image.width, image.height, ScaleMethod.Bicubic))))
+            Some(image.filter(OverlayFilter(scaleTo(overlayImage, image.width, image.height))))
           }
           case _ => {
             log.error(s"Failed to apply overlay")
@@ -164,8 +164,8 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
             Some {
               image.filter {
                 // We resize the overlay and mask since the filter requires that they be the same size
-                MaskFilter(overlayImage.scaleTo(image.width, image.height, ScaleMethod.Bicubic),
-                  maskImage.scaleTo(image.width, image.height, ScaleMethod.Bicubic))
+                MaskFilter(scaleTo(overlayImage, image.width, image.height),
+                  scaleTo(maskImage, image.width, image.height))
               }
             }
           }
@@ -203,6 +203,14 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
       }
     }
     completedLayers.lastOption
+  }
+
+  def scaleTo(image: Image, width: Int, height: Int): Image = {
+    if (image.width == width && image.height == height) {
+      image
+    } else {
+      image.scaleTo(width, height, ScaleMethod.Bicubic)
+    }
   }
 
   def apply(req: Request): Future[Response] = {
@@ -251,7 +259,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
                 applyLayerFilters(imageMap, layers, width, height) match {
                   case Some(image) => {
                     // Apply final resize and build response
-                    buildResponse(req, image.scaleTo(width, height, ScaleMethod.Bicubic), format, compression)
+                    buildResponse(req, scaleTo(image, width, height), format, compression)
                   }
                   case None => {
                     Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
