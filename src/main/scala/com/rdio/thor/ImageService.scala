@@ -85,7 +85,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
               val font: Font = if (fontFamilies.contains(family)) {
                 new Font(family, style, size)
               } else {
-                val resourceStream = getClass.getResourceAsStream(s"${family.toLowerCase}.ttf")
+                val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
                 val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
                 font.deriveFont(style, size)
               }
