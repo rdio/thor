@@ -1,6 +1,8 @@
 Thor
 ====
 
+[![Build Status](https://travis-ci.org/rdio/thor.svg?branch=master)](https://travis-ci.org/rdio/thor)
+
 A Finagle-based image processor.
 
 NOTE: JDK7 or higher required. Run `java -version` and check that it shows at least `1.7`.
