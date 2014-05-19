@@ -218,9 +218,9 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
 
     req.params.get("l") match {
       case Some(layers) => {
-        // Restrict dimensions to the range 200-1200
-        val width: Int = math.min(math.max(req.params.getIntOrElse("w", 200), 200), 1200)
-        val height: Int = math.min(math.max(req.params.getIntOrElse("h", 200), 200), 1200)
+        // Restrict dimensions to the range 1-1200
+        val width: Int = math.min(math.max(req.params.getIntOrElse("w", 200), 1), 1200)
+        val height: Int = math.min(math.max(req.params.getIntOrElse("h", 200), 1), 1200)
 
         // Restrict compression to the range 0-100
         val compression: Int = math.min(math.max(req.params.getIntOrElse("c", 98), 0), 100)
