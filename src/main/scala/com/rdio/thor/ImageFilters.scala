@@ -1,7 +1,8 @@
 package com.rdio.thor
 
-import java.awt.{Font, FontMetrics, AlphaComposite, Color, Graphics2D, RenderingHints, LinearGradientPaint, MultipleGradientPaint}
+import java.awt.{Font, FontMetrics, AlphaComposite, Color, Graphics2D, RenderingHints, LinearGradientPaint, MultipleGradientPaint, Rectangle}
 import java.awt.geom.{RoundRectangle2D, AffineTransform, Point2D, Rectangle2D}
+import java.awt.font.{FontRenderContext, GlyphVector}
 import java.awt.image.BufferedImage
 
 import com.sksamuel.scrimage.{BufferedOpFilter, Filter, Image, ScaleMethod}
@@ -54,21 +55,21 @@ class TextFilter(text: String, font: Font, color: Color) extends Filter {
     g2.setFont(font)
     g2.setColor(color)
 
-    val metrics: FontMetrics = g2.getFontMetrics
-    val bounds = metrics.getStringBounds(text, g2)
+    val centerX: Int = image.width / 2
+    val centerY: Int = image.height / 2
 
-    val width = bounds.getWidth.toInt
+    val fontMetrics: FontMetrics = g2.getFontMetrics
+    val stringBounds: Rectangle = fontMetrics.getStringBounds(text, g2).getBounds
 
-    val x: Int = (image.width - width) / 2
+    val graphicsFont: Font = g2.getFont
+    val renderContext: FontRenderContext = g2.getFontRenderContext
+    val glyphVector: GlyphVector = graphicsFont.createGlyphVector(renderContext, text)
+    val visualBounds: Rectangle = glyphVector.getVisualBounds().getBounds()
 
-    // Subtract descent because its rendered from baseline while we want to
-    // center from ascent height.
+    val textX: Int = centerX - stringBounds.width / 2
+    val textY: Int = centerY - visualBounds.height / 2 - visualBounds.y
 
-    // We use "height - descent" instead of "leading + ascent" due to float
-    // rounding errors.
-    val y: Int = (image.height + bounds.getHeight.toInt - metrics.getDescent) / 2
-
-    g2.drawString(text, x, y)
+    g2.drawString(text, textX, textY)
   }
 }
 
