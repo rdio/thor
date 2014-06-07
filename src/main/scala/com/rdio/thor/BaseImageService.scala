@@ -47,13 +47,21 @@ abstract class BaseImageService(conf: Config) extends Service[Request, Response]
     .name("thor-client")
     .build()
 
+  def buildAnimatedResponse[T <: ImageWriter](req: Request, frames: List[Frame], format: Format[T], compression: Int = 98): Response = {
+    val bytes = AnimatedGifWriter(frames).write()
+    furtherBuildOutResponse(req, bytes, format, compression)
+  }
+
   def buildResponse[T <: ImageWriter](req: Request, image: Image, format: Format[T], compression: Int = 98): Response = {
     val bytes = format match {
       case Format.JPEG => image.writer(format).withCompression(compression).withProgressive(true).write()
       case Format.PNG => image.writer(format).withMaxCompression.write()
       case Format.GIF => image.writer(format).withProgressive(true).write()
     }
+    furtherBuildOutResponse(req, bytes, format, compression)
+  }
 
+  def furtherBuildOutResponse[T <: ImageWriter](req: Request, bytes: Array[Byte], format: Format[T], compression: Int = 98): Response = {
     val expires: Calendar = Calendar.getInstance()
     expires.add(Calendar.YEAR, 1)
 

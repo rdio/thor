@@ -34,6 +34,7 @@ case class RoundCornersPercentNode(radius: Float) extends FilterNode
 case class OverlayNode(overlay: ImageNode) extends FilterNode
 case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode
 case class CoverNode(width: Int, height: Int) extends FilterNode
+case class FrameNode(durationInMs: Int) extends FilterNode
 
 case class LayerNode(path: ImageNode, filter: FilterNode)
 
@@ -225,13 +226,18 @@ class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
     case width ~ _ ~ height => CoverNode(width, height)
   }
 
+  // frame filter
+  def frame: Parser[FrameNode] = "frame(" ~> integer <~ ")" ^^ {
+    case durationInMs => FrameNode(durationInMs)
+  }
+
   // all filters
   def filters: Parser[FilterNode] =
     text | linear | boxblur | boxblurpercent |
     blur | scaleto | zoom | scale |
     grid | round | roundpercent | mask |
-    colorize | overlay | pad | padpercent
-
+    colorize | overlay | pad | padpercent | cover | frame
+  
   // layer - matches a single layer
   def layer: Parser[LayerNode] =
     // Match a path without filters
