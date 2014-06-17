@@ -47,7 +47,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
       case BoxBlurNode(hRadius, vRadius) => {
         val originalWidth = image.width
         val originalHeight = image.height
-        val downsampleFactor = 2
+        val downsampleFactor = 4
         val downsampling = 1.0f / downsampleFactor
         val downsampledHRadius: Int = math.round(hRadius * downsampling)
         val downsampledVRadius: Int = math.round(vRadius * downsampling)
@@ -64,7 +64,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         val originalHeight = image.height
         val hRadius = (hPercent * originalWidth.toFloat).toInt
         val vRadius = (vPercent * originalHeight.toFloat).toInt
-        val downsampleFactor = 2
+        val downsampleFactor = 4
         val downsampling = 1.0f / downsampleFactor
         val downsampledHRadius: Int = math.round(hRadius * downsampling)
         val downsampledVRadius: Int = math.round(vRadius * downsampling)
