@@ -55,7 +55,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some {
           image.scale(downsampling).filter(BoxBlurFilter(downsampledHRadius, downsampledVRadius))
             .trim(1, 1, 1, 1) // Remove bleeded edges
-            .scaleTo(originalWidth, originalHeight, ScaleMethod.Bicubic) // Scale up a bit to account for trim
+            .scaleTo(originalWidth, originalHeight, ScaleMethod.FastScale) // Scale up a bit to account for trim
         }
       }
 
@@ -72,7 +72,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some {
           image.scale(downsampling).filter(BoxBlurFilter(downsampledHRadius, downsampledVRadius))
             .trim(1, 1, 1, 1) // Remove bleeded edges
-            .scaleTo(originalWidth, originalHeight, ScaleMethod.Bicubic) // Scale up a bit to account for trim
+            .scaleTo(originalWidth, originalHeight, ScaleMethod.FastScale) // Scale up a bit to account for trim
         }
       }
 
@@ -103,14 +103,14 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         val originalWidth = image.width
         val originalHeight = image.height
         Some {
-          image.scale(1.0f + percentage, ScaleMethod.Bicubic)
+          image.scale(1.0f + percentage, ScaleMethod.FastScale)
             .resizeTo(originalWidth, originalHeight)
         }
       }
 
-      case ScaleNode(percentage) => Some(image.scale(percentage, ScaleMethod.Bicubic))
+      case ScaleNode(percentage) => Some(image.scale(percentage, ScaleMethod.FastScale))
 
-      case ScaleToNode(width, height) => Some(image.scaleTo(width, height, ScaleMethod.Bicubic))
+      case ScaleToNode(width, height) => Some(image.scaleTo(width, height, ScaleMethod.FastScale))
 
       case PadNode(padding) => Some(image.pad(padding, new Color(0, 0, 0, 0)))
 
@@ -142,7 +142,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some(image.filter(RoundCornersFilter(radius)))
       }
 
-      case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.Bicubic))
+      case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.FastScale))
 
       case OverlayNode(overlay) => {
         tryGetImage(overlay, imageMap, completedLayers, width, height) match {
