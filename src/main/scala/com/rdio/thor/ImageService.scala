@@ -209,7 +209,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
     if (image.width == width && image.height == height) {
       image
     } else {
-      image.scaleTo(width, height, ScaleMethod.Bicubic)
+      image.scaleTo(width, height, ScaleMethod.FastScale)
     }
   }
 
