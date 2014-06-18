@@ -55,7 +55,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some {
           image.scale(downsampling).filter(BoxBlurFilter(downsampledHRadius, downsampledVRadius))
             .trim(1, 1, 1, 1) // Remove bleeded edges
-            .scaleTo(originalWidth, originalHeight, ScaleMethod.FastScale) // Scale up a bit to account for trim
+            .scaleTo(originalWidth, originalHeight, ScaleMethod.Bicubic) // Scale up a bit to account for trim
         }
       }
 
@@ -72,7 +72,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some {
           image.scale(downsampling).filter(BoxBlurFilter(downsampledHRadius, downsampledVRadius))
             .trim(1, 1, 1, 1) // Remove bleeded edges
-            .scaleTo(originalWidth, originalHeight, ScaleMethod.FastScale) // Scale up a bit to account for trim
+            .scaleTo(originalWidth, originalHeight, ScaleMethod.Bicubic) // Scale up a bit to account for trim
         }
       }
 
