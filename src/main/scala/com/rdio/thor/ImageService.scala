@@ -103,14 +103,14 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         val originalWidth = image.width
         val originalHeight = image.height
         Some {
-          image.scale(1.0f + percentage, ScaleMethod.FastScale)
+          image.scale(1.0f + percentage, ScaleMethod.Bicubic)
             .resizeTo(originalWidth, originalHeight)
         }
       }
 
-      case ScaleNode(percentage) => Some(image.scale(percentage, ScaleMethod.FastScale))
+      case ScaleNode(percentage) => Some(image.scale(percentage, ScaleMethod.Bicubic))
 
-      case ScaleToNode(width, height) => Some(image.scaleTo(width, height, ScaleMethod.FastScale))
+      case ScaleToNode(width, height) => Some(image.scaleTo(width, height, ScaleMethod.Bicubic))
 
       case PadNode(padding) => Some(image.pad(padding, new Color(0, 0, 0, 0)))
 
@@ -142,7 +142,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         Some(image.filter(RoundCornersFilter(radius)))
       }
 
-      case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.FastScale))
+      case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.Bicubic))
 
       case OverlayNode(overlay) => {
         tryGetImage(overlay, imageMap, completedLayers, width, height) match {
@@ -209,7 +209,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
     if (image.width == width && image.height == height) {
       image
     } else {
-      image.scaleTo(width, height, ScaleMethod.FastScale)
+      image.scaleTo(width, height, ScaleMethod.Bicubic)
     }
   }
 
