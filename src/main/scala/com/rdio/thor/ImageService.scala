@@ -22,6 +22,7 @@ import com.typesafe.config.Config
 import org.jboss.netty.handler.codec.http._
 import org.jboss.netty.buffer.ChannelBuffers
 
+
 /** ImageService serves images optionally filtered and blended. */
 class ImageService(conf: Config) extends BaseImageService(conf) {
 
@@ -179,19 +180,24 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
       case _: NoopNode => Some(image)
     }
   }
-
-  def applyLayerFilters(imageMap: Map[String, Image], layers: List[LayerNode], width: Int, height: Int): Option[Image] = {
+  def applyLayerFilters(imageMap: Map[String, Image], layers: List[LayerNode], width: Int, height: Int): (Option[Image], List[Frame]) = {
     // Apply each layer in order
     val completedLayers = ArrayBuffer.empty[Image]
+    var completedFrames:List[Frame] = List()
     layers foreach {
       case LayerNode(path: ImageNode, filter: FilterNode) => {
         tryGetImage(path, imageMap, completedLayers.toArray, width, height) match {
           case Some(baseImage) => {
-            applyFilter(baseImage, filter, imageMap, completedLayers.toArray, width, height) match {
-              case Some(filteredImage) => completedLayers += filteredImage
-              case None => {
-                log.error(s"Failed to apply layer filter: $path $filter")
-                None
+            filter match {
+              case frame:FrameNode => completedFrames = completedFrames :+ Frame(baseImage, frame.durationInMs)
+              case _ => {
+                applyFilter(baseImage, filter, imageMap, completedLayers.toArray, width, height) match {
+                  case Some(filteredImage) => completedLayers += filteredImage
+                  case None => {
+                    log.error(s"Failed to apply layer filter: $path $filter")
+                    None
+                  }
+                }
               }
             }
           }
@@ -202,7 +208,8 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         }
       }
     }
-    completedLayers.lastOption
+    log.info(s" Yo rebecca i see ${completedFrames.length}")
+    (completedLayers.lastOption, completedFrames)
   }
 
   def scaleTo(image: Image, width: Int, height: Int): Image = {
@@ -226,6 +233,7 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         val compression: Int = math.min(math.max(req.params.getIntOrElse("c", 98), 0), 100)
 
         val format: Format[ImageWriter] = req.params.get("f") match {
+          case Some("gif") => Format.GIF.asInstanceOf[Format[ImageWriter]]
           case Some("png") => Format.PNG.asInstanceOf[Format[ImageWriter]]
           case _ => Format.JPEG.asInstanceOf[Format[ImageWriter]]
         }
@@ -257,11 +265,16 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
 
                 // Apply any filters to each image and return the final image
                 applyLayerFilters(imageMap, layers, width, height) match {
-                  case Some(image) => {
+                  case (_, frames) if frames.length > 1 => {
                     // Apply final resize and build response
-                    buildResponse(req, scaleTo(image, width, height), format, compression)
+                    val resizedFrames = frames.map( f => Frame(scaleTo(f.image, width, height), f.durationInMs))
+                    buildAnimatedResponse(req, resizedFrames, format, compression)
                   }
-                  case None => {
+                  case (Some(image), _) => {
+                    // Apply final resize and build response
+                    buildResponse(req, image, format, compression)
+                  }
+                  case _ => {
                     Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
                   }
                 }
