@@ -17,7 +17,6 @@ import com.twitter.finagle.builder.ClientBuilder
 import com.twitter.finagle.http.{Http, Status, RichHttp, Request, Response, Message}
 import com.twitter.logging.Logger
 import com.twitter.util.{Await, Future}
-
 import com.typesafe.config.Config
 
 import org.jboss.netty.handler.codec.http._
@@ -33,19 +32,12 @@ object BaseImageService {
   }
 }
 
-abstract class BaseImageService(conf: Config) extends Service[Request, Response] {
-
-  protected lazy val log = Logger.get(this.getClass)
+abstract class BaseImageService(conf: Config, client: Service[Request, Response]) extends Service[Request, Response] {
 
   protected lazy val mediaHost: String = conf.getString("IMAGESERVER_MEDIA_HOST")
   protected lazy val mediaPort: Int = conf.getInt("IMAGESERVER_MEDIA_PORT")
 
-  protected lazy val imageClient: Service[Request, Response] = ClientBuilder()
-    .codec(RichHttp[Request](Http()))
-    .hosts(new InetSocketAddress(mediaHost, mediaPort))
-    .hostConnectionLimit(100)
-    .name("thor-client")
-    .build()
+  protected lazy val log = Logger.get(this.getClass)
 
   def buildResponse[T <: ImageWriter](req: Request, image: Image, format: Format[T], compression: Int = 98): Response = {
     val bytes = format match {
@@ -72,7 +64,7 @@ abstract class BaseImageService(conf: Config) extends Service[Request, Response]
     req.userAgent = "Thor-Imageserver"
     req.host = s"$mediaHost:$mediaPort"
     req.accept = "image/*"
-    imageClient(req) map {
+    client(req) map {
       res => res.status match {
         case Status.Ok => {
           Some(res.withInputStream[Image](inputStream => Image(inputStream)))
