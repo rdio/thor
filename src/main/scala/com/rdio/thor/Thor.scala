@@ -23,12 +23,14 @@ object Thor extends App {
       conf.getString("IMAGESERVER_MEDIA_HOST"),
       conf.getInt("IMAGESERVER_MEDIA_PORT")))
     .hostConnectionLimit(100)
+    .requestTimeout(500.milliseconds)
     .name("thor-client")
     .build()
 
   val server = ServerBuilder()
     .codec(RichHttp[Request](Http()))
     .bindTo(new InetSocketAddress(port))
+    .requestTimeout(2.seconds)
     .name("thor-server")
     .build(new ImageService(conf, client))
 }
