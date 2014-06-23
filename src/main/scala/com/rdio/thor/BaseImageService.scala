@@ -68,6 +68,8 @@ abstract class BaseImageService(conf: Config) extends Service[Request, Response]
   }
 
   def requestImage(url: String): Future[Option[Image]] = {
+    log.info(s"Loading $url from $mediaHost:$mediaPort")
+
     val req = Request("/" + url)
     req.userAgent = "Thor-Imageserver"
     req.host = s"$mediaHost:$mediaPort"
