@@ -17,7 +17,6 @@ object Thor extends App {
 
   val port: Int = conf.getInt("IMAGESERVER_PORT")
 
-  println(s"${conf.getString("IMAGESERVER_MEDIA_HOST")}:${conf.getInt("IMAGESERVER_MEDIA_PORT")}")
   val client = ClientBuilder()
     .codec(RichHttp[Request](Http()))
     .hosts(new InetSocketAddress(
