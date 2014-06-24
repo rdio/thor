@@ -213,8 +213,6 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   }
 
   def apply(req: Request): Future[Response] = {
-    log.info(s"Received request: ${req.params}")
-
     req.params.get("l") match {
       case Some(layers) => {
         // Restrict dimensions to the range 1-1200

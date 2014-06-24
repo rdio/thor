@@ -55,7 +55,7 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
     res.setHeader(HttpHeaders.Names.CONTENT_LENGTH, bytes.length.toString)
     res.setHeader(HttpHeaders.Names.CACHE_CONTROL, "max-age=31536000") // 1 year = 1 day in seconds x 365 (max age per rfc)
     res.setHeader(HttpHeaders.Names.EXPIRES, Message.httpDateFormat(expires.getTime()))
-    res.setContent(ChannelBuffers.copiedBuffer(bytes))
+    res.setContent(ChannelBuffers.wrappedBuffer(bytes))
     res
   }
 

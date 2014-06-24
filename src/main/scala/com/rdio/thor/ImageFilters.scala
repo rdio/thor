@@ -120,7 +120,9 @@ object RoundCornersFilter {
 /** Draws an image over the current image. */
 class OverlayFilter(overlay: Image) extends Filter {
   def apply(image: Image) {
-    image._draw(overlay.awt)
+    val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
+    g2.drawImage(overlay.awt, 0, 0, null)
+    g2.dispose()
   }
 }
 

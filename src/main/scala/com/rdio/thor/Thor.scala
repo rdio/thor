@@ -15,21 +15,19 @@ import org.jboss.netty.handler.codec.http._
 object Thor extends App {
   val conf: Config = ConfigFactory.load()
 
-  val port: Int = conf.getInt("IMAGESERVER_PORT")
-
   val client = ClientBuilder()
     .codec(RichHttp[Request](Http()))
     .hosts(new InetSocketAddress(
       conf.getString("IMAGESERVER_MEDIA_HOST"),
       conf.getInt("IMAGESERVER_MEDIA_PORT")))
     .hostConnectionLimit(100)
-    .requestTimeout(500.milliseconds)
+    .requestTimeout(1.seconds)
     .name("thor-client")
     .build()
 
   val server = ServerBuilder()
     .codec(RichHttp[Request](Http()))
-    .bindTo(new InetSocketAddress(port))
+    .bindTo(new InetSocketAddress(conf.getInt("IMAGESERVER_PORT")))
     .requestTimeout(2.seconds)
     .name("thor-server")
     .build(new ImageService(conf, client))
