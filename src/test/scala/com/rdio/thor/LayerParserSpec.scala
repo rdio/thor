@@ -60,9 +60,25 @@ class FilterParserSpec extends BaseSpec {
     parser.parseAll(parser.font, "bold \"Helvetica\"").get should be (FontNode("Helvetica", 12, 1))
   }
 
+  "Parser" should "be able to parse font percentages" in {
+    parser.parseAll(parser.fontpercent, "bold italic bold bold italic 50% \"Helvetica\"").get should be (FontPercentNode("Helvetica", 0.5f, 3))
+    parser.parseAll(parser.fontpercent, "bold italic 50% \"Helvetica\"").get should be (FontPercentNode("Helvetica", 0.5f, 3))
+    parser.parseAll(parser.fontpercent, "bold 50% \"Helvetica\"").get should be (FontPercentNode("Helvetica", 0.5f, 1))
+    parser.parseAll(parser.fontpercent, "italic 50% \"Helvetica\"").get should be (FontPercentNode("Helvetica", 0.5f, 2))
+    parser.parseAll(parser.fontpercent, "50% \"Helvetica\"").get should be (FontPercentNode("Helvetica", 0.5f, 0))
+    parser.parseAll(parser.fontpercent, "\"Helvetica\"").get should be (FontPercentNode("Helvetica", 1.0f, 0))
+    parser.parseAll(parser.fontpercent, "bold \"Helvetica\"").get should be (FontPercentNode("Helvetica", 1.0f, 1))
+  }
+
   "Parser" should "be able to parse text" in {
     parser.parseAll(parser.text, "text(\"Hello world!\", bold 16px \"Helvetica\", rgb(0, 0, 0))").get should be {
       TextNode("Hello world!", FontNode("Helvetica", 16, 1), Color.black)
+    }
+  }
+
+  "Parser" should "be able to parse text percentages" in {
+    parser.parseAll(parser.textpercent, "text(\"Hello world!\", bold 50% \"Helvetica\", rgb(0, 0, 0))").get should be {
+      TextPercentNode("Hello world!", FontPercentNode("Helvetica", 0.5f, 1), Color.black)
     }
   }
 

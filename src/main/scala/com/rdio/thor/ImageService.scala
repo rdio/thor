@@ -97,6 +97,28 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
         }
       }
 
+      case TextPercentNode(text, font, color) => {
+        font match {
+          case FontPercentNode(family, percentage, style) => {
+            val ge: GraphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+            val fontFamilies: Array[String] = ge.getAvailableFontFamilyNames()
+            val size: Int = (percentage * math.max(image.width, image.height).toFloat).toInt
+            try {
+              val font: Font = if (fontFamilies.contains(family)) {
+                new Font(family, style, size)
+              } else {
+                val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
+                val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
+                font.deriveFont(style, size)
+              }
+              Some(image.filter(TextFilter(text, font, color)))
+            } catch {
+              case _: Exception => None
+            }
+          }
+        }
+      }
+
       case ColorizeNode(color) => Some(image.filter(ColorizeFilter(color)))
 
       case ZoomNode(percentage) => {
