@@ -8,6 +8,7 @@ import scala.util.parsing.combinator._
 case class ColorStop(color: Color, stop: Float)
 
 case class FontNode(family: String = "Helvetica", size: Int = 12, style: Int = 0)
+case class FontPercentNode(family: String = "Helvetica", size: Float = 1.0f, style: Int = 0)
 
 trait ImageNode{}
 case class EmptyNode() extends ImageNode
@@ -26,6 +27,7 @@ case class ScaleNode(percentage: Float) extends FilterNode
 case class ZoomNode(percentage: Float) extends FilterNode
 case class ScaleToNode(width: Int, height: Int) extends FilterNode
 case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode
+case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode
 case class GridNode(paths: List[ImageNode]) extends FilterNode
 case class PadNode(padding: Int) extends FilterNode
 case class PadPercentNode(padding: Float) extends FilterNode
@@ -89,6 +91,14 @@ class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
       val style: Int = maybeStyle.getOrElse(Font.PLAIN)
       val size: Int = maybeSize.getOrElse(12)
       FontNode(family, size, style)
+    }
+  }
+
+  def fontpercent: Parser[FontPercentNode] = (fontStyles?) ~ (percent?) ~ string ^^ {
+    case maybeStyle ~ maybePercentage ~ family => {
+      val style: Int = maybeStyle.getOrElse(Font.PLAIN)
+      val size: Float = maybePercentage.getOrElse(1.0f)
+      FontPercentNode(family, size, style)
     }
   }
 
@@ -192,6 +202,11 @@ class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
     case text ~ _ ~ font ~ _ ~ color => TextNode(text, font, color)
   }
 
+  // textpercent filter
+  def textpercent: Parser[TextPercentNode] = "text(" ~> string ~ "," ~ fontpercent ~ "," ~ color <~ ")" ^^ {
+    case text ~ _ ~ fontpercent ~ _ ~ color => TextPercentNode(text, fontpercent, color)
+  }
+
   // round filter
   def round: Parser[RoundCornersNode] = "round(" ~> pixels <~ ")" ^^ {
     case radius => RoundCornersNode(radius)
@@ -230,7 +245,8 @@ class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
     text | linear | boxblur | boxblurpercent |
     blur | scaleto | zoom | scale |
     grid | round | roundpercent | mask |
-    colorize | overlay | pad | padpercent
+    colorize | overlay | pad | padpercent |
+    textpercent
 
   // layer - matches a single layer
   def layer: Parser[LayerNode] =

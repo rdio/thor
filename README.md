@@ -35,7 +35,7 @@ Querystring Params
       - blur - `blur()` - blurs the image using a 3x3 convolution kernel
       - text - `text("<text>", font, <rgb|rgba>)` - draws the specified text over the center of the image
         - text - text string; must be wrapped in double-quotes
-        - font - `<normal|bold|italic> <font-size>px "<name-string>"` — font declaration
+        - font - `<normal|bold|italic> <font-size>px|<font-size>% "<name-string>"` — font declaration
         - NOTE: The font must be installed locally or copied as a .ttf into the resources folder
       - boxblur - `boxblur(<horizontal-radius>px, <vertical-radius>px)|boxblur(<horizontal-radius>%, <vertical-radius>%)` - applies a box blur to the image by `horizontal-radius` and `vertical-radius`
       - scale - `scale(<percent>%)` - resizes the image by `percent`
