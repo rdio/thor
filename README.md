@@ -24,7 +24,7 @@ Querystring Params
 - `f` - file format; one of: `png` or `jpeg` (default)
 - `l` - `<layer>[; <layer>]+` - a sequence of one or more layers separated by a semi-colon: `;`
   - layer - `<source>[:<filter>]|<filter>` - a layer consists of a single image source and an optional filter separated by a colon: `:`, or a single filter without a source
-    - source - `<url>|$<index>|_` - either a relative url path or a layer reference or an empty layer
+    - source - `<url>|$<index>|_` - either a relative url path or a layer reference or an empty layer. NOTE: An incorrect source will log and fail silently, returning the image as far as processed.
       - url - any relative url accessible by the media provider
       - layer reference - `$<index>` - zero-based index into any _preceeding_ layer
       - empty layer — `_` - a blank layer the size of the final output with pixels initialized to fully transparent
