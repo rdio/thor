@@ -32,6 +32,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
       case PathNode(path) if imageMap.contains(path) => imageMap.get(path)
       case EmptyNode() => Some(Image.filled(width, height, new Color(0, 0, 0, 0)))
       case PreviousNode() if completedLayers.nonEmpty => Some(completedLayers.last)
+      case _ => None
     }
   }
 
@@ -171,7 +172,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
             Some(image.filter(OverlayFilter(scaleTo(overlayImage, image.width, image.height))))
           }
           case _ => {
-            log.error(s"Failed to apply overlay")
+            log.error(s"Failed to apply overlay: $overlay failed to load")
             None
           }
         }
@@ -191,7 +192,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
             }
           }
           case _ => {
-            log.error(s"Failed to apply mask")
+            log.error(s"Failed to apply mask: $overlay or $mask failed to load")
             None
           }
         }
