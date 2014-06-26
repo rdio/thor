@@ -20,7 +20,7 @@ object Thor extends App {
     .hosts(new InetSocketAddress(
       conf.getString("IMAGESERVER_MEDIA_HOST"),
       conf.getInt("IMAGESERVER_MEDIA_PORT")))
-    .hostConnectionLimit(100) // This is required
+    .hostConnectionLimit(conf.getInt("HOST_CONNECTION_LIMIT"))
     .name("thor-client")
     .build()
 
