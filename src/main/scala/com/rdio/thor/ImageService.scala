@@ -16,14 +16,13 @@ import com.twitter.finagle.Service
 import com.twitter.finagle.builder.ClientBuilder
 import com.twitter.finagle.http.{Http, Status, RichHttp, Request, Response, Message}
 import com.twitter.util.{Await, Future}
-
 import com.typesafe.config.Config
 
 import org.jboss.netty.handler.codec.http._
 import org.jboss.netty.buffer.ChannelBuffers
 
 /** ImageService serves images optionally filtered and blended. */
-class ImageService(conf: Config) extends BaseImageService(conf) {
+class ImageService(conf: Config, client: Service[Request, Response]) extends BaseImageService(conf, client) {
 
   protected def parserFactory(width: Int, height: Int) = new LayerParser(width, height)
 
@@ -237,8 +236,6 @@ class ImageService(conf: Config) extends BaseImageService(conf) {
   }
 
   def apply(req: Request): Future[Response] = {
-    log.info(s"Received request: ${req.params}")
-
     req.params.get("l") match {
       case Some(layers) => {
         // Restrict dimensions to the range 1-1200
