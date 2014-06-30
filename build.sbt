@@ -32,8 +32,8 @@ resolvers ++= Seq(
 )
 
 libraryDependencies ++= Seq(
-  "com.sksamuel.scrimage" %% "scrimage-core" % "1.4.1",
-  "com.sksamuel.scrimage" %% "scrimage-filters" % "1.4.1",
+  "com.sksamuel.scrimage" %% "scrimage-core" % "1.3.5",
+  "com.sksamuel.scrimage" %% "scrimage-filters" % "1.3.5",
   "com.twitter" %% "finagle-http" % "6.6.2",
   "com.typesafe" % "config" % "1.2.1",
   "org.scalatest" % "scalatest_2.10" % "2.1.3" % "test"
