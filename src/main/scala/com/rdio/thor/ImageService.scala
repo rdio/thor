@@ -26,6 +26,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
 
   protected def parserFactory(width: Option[Int], height: Option[Int]) = new LayerParser(width, height)
 
+  // implicit def aspectRatio(image: Image): Float = image.width.toFloat / image.height.toFloat
   def getAspectRatio(image: Image): Float = {
     return image.width.toFloat / image.height.toFloat
   }
@@ -38,7 +39,11 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
       // Width provided
       case (Some(width), None) => {
         image match {
-          case Some(image) => (width, (width.toFloat * getAspectRatio(image)).toInt)
+
+          // Image provided
+          case Some(image) => (width, (width.toFloat / getAspectRatio(image)).toInt)
+
+          // No image to infer aspect ratio
           case None => (width, width)
         }
       }
@@ -46,7 +51,11 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
       // Height provided
       case (None, Some(height)) => {
         image match {
+
+          // Image provided
           case Some(image) => ((getAspectRatio(image) * height.toFloat).toInt, height)
+
+          // No image to infer aspect ratio
           case None => (height, height)
         }
       }
@@ -54,7 +63,11 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
       // None provided
       case (None, None) => {
         image match {
+
+          // Image provided
           case Some(image) => (image.width, image.height)
+
+          // No image to infer aspect ratio
           case None => (200, 200)
         }
       }
@@ -67,7 +80,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
       case PathNode(path) if imageMap.contains(path) => imageMap.get(path)
       case EmptyNode() => {
         Some {
-          val (w, h) = inferDimensions(image, width, height)
+          val (w, h) = inferDimensions(None, width, height)
           Image.filled(w, h, new Color(0, 0, 0, 0))
         }
       }
@@ -76,7 +89,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
     }
   }
 
-  def applyFilter(image: Image, filter: FilterNode, imageMap: Map[String, Image], completedLayers: Array[Image], width: Int, height: Int): Option[Image] = {
+  def applyFilter(image: Image, filter: FilterNode, imageMap: Map[String, Image], completedLayers: Array[Image], width: Option[Int], height: Option[Int]): Option[Image] = {
     filter match {
 
       case LinearGradientNode(degrees, colors, stops) =>
@@ -242,29 +255,45 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
     }
   }
 
-  def applyLayerFilters(imageMap: Map[String, Image], layers: List[LayerNode], width: Option[Int], height: Option[Int]): Option[Image] = {
-    // Apply each layer in order
-    val completedLayers = ArrayBuffer.empty[Image]
-    layers foreach {
-      case LayerNode(path: ImageNode, filter: FilterNode) => {
-        tryGetImage(path, imageMap, completedLayers.toArray, width, height) match {
-          case Some(baseImage) => {
-            applyFilter(baseImage, filter, imageMap, completedLayers.toArray, width, height) match {
-              case Some(filteredImage) => completedLayers += filteredImage
+  // TODO: Make recursive, layers.head, layers.tail
+  def applyLayerFilters(completedLayers: ArrayBuffer[Image], imageMap: Map[String, Image], layers: List[LayerNode], width: Option[Int], height: Option[Int]): Option[Image] = {
+    layers.headOption match {
+      case Some(layer) => {
+        layer match {
+          case LayerNode(path: ImageNode, filter: FilterNode) => {
+            tryGetImage(path, imageMap, completedLayers.toArray, width, height) match {
+              case Some(baseImage) => {
+                val (w, h) = inferDimensions(Some(baseImage), width, height)
+
+                applyFilter(baseImage, filter, imageMap, completedLayers.toArray, Some(w), Some(h)) match {
+                  case Some(filteredImage) => {
+                    completedLayers += filteredImage
+                    applyLayerFilters(completedLayers, imageMap, layers.tail, Some(w), Some(h))
+                  }
+                  case None => {
+                    log.error(s"Failed to apply layer filter: $path $filter")
+                    None
+                  }
+                }
+              }
               case None => {
-                log.error(s"Failed to apply layer filter: $path $filter")
+                log.error(s"Failed to get layer source: $path")
                 None
               }
             }
           }
-          case None => {
-            log.error(s"Failed to get layer source: $path")
-            None
+        }
+      }
+      case None => {
+        completedLayers.lastOption match {
+          case Some(image) => {
+            val (w, h) = inferDimensions(Some(image), width, height)
+            Some(scaleTo(image, w, h))
           }
+          case None => None
         }
       }
     }
-    completedLayers.lastOption
   }
 
   def scaleTo(image: Image, width: Int, height: Int): Image = {
@@ -285,14 +314,14 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
           // Restrict dimensions to the range 1-1200
           case Some(width) => Some(math.min(math.max(width, 1), 1200))
           // Ensure at least one dimension has a value
-          case None => if (h.isEmpty) Some(200) else None
+          case None => None
         }
 
         val height: Option[Int] = h match {
           // Restrict dimensions to the range 1-1200
           case Some(height) => Some(math.min(math.max(height, 1), 1200))
           // Ensure at least one dimension has a value
-          case None => if (w.isEmpty) Some(200) else None
+          case None => None
         }
 
         // Restrict compression to the range 0-100
@@ -329,10 +358,10 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
                 }
 
                 // Apply any filters to each image and return the final image
-                applyLayerFilters(imageMap, layers, width, height) match {
+                applyLayerFilters(ArrayBuffer.empty[Image], imageMap, layers, width, height) match {
                   case Some(image) => {
                     // Apply final resize and build response
-                    buildResponse(req, scaleTo(image, width, height), format, compression)
+                    buildResponse(req, image, format, compression)
                   }
                   case None => {
                     Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
