@@ -24,13 +24,53 @@ import org.jboss.netty.buffer.ChannelBuffers
 /** ImageService serves images optionally filtered and blended. */
 class ImageService(conf: Config, client: Service[Request, Response]) extends BaseImageService(conf, client) {
 
-  protected def parserFactory(width: Int, height: Int) = new LayerParser(width, height)
+  protected def parserFactory(width: Option[Int], height: Option[Int]) = new LayerParser(width, height)
 
-  def tryGetImage(pathOrImage: ImageNode, imageMap: Map[String, Image], completedLayers: Array[Image], width: Int, height: Int): Option[Image] = {
+  def getAspectRatio(image: Image): Float = {
+    return image.width.toFloat / image.height.toFloat
+  }
+
+  def inferDimensions(image: Option[Image], width: Option[Int], height: Option[Int]): Tuple2[Int, Int] = {
+    (width, height) match {
+      // Both provided
+      case (Some(width), Some(height)) => (width, height)
+
+      // Width provided
+      case (Some(width), None) => {
+        image match {
+          case Some(image) => (width, (width.toFloat * getAspectRatio(image)).toInt)
+          case None => (width, width)
+        }
+      }
+
+      // Height provided
+      case (None, Some(height)) => {
+        image match {
+          case Some(image) => ((getAspectRatio(image) * height.toFloat).toInt, height)
+          case None => (height, height)
+        }
+      }
+
+      // None provided
+      case (None, None) => {
+        image match {
+          case Some(image) => (image.width, image.height)
+          case None => (200, 200)
+        }
+      }
+    }
+  }
+
+  def tryGetImage(pathOrImage: ImageNode, imageMap: Map[String, Image], completedLayers: Array[Image], width: Option[Int], height: Option[Int]): Option[Image] = {
     pathOrImage match {
       case IndexNode(index) if index < completedLayers.length => Some(completedLayers(index))
       case PathNode(path) if imageMap.contains(path) => imageMap.get(path)
-      case EmptyNode() => Some(Image.filled(width, height, new Color(0, 0, 0, 0)))
+      case EmptyNode() => {
+        Some {
+          val (w, h) = inferDimensions(image, width, height)
+          Image.filled(w, h, new Color(0, 0, 0, 0))
+        }
+      }
       case PreviousNode() if completedLayers.nonEmpty => Some(completedLayers.last)
       case _ => None
     }
@@ -202,7 +242,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
     }
   }
 
-  def applyLayerFilters(imageMap: Map[String, Image], layers: List[LayerNode], width: Int, height: Int): Option[Image] = {
+  def applyLayerFilters(imageMap: Map[String, Image], layers: List[LayerNode], width: Option[Int], height: Option[Int]): Option[Image] = {
     // Apply each layer in order
     val completedLayers = ArrayBuffer.empty[Image]
     layers foreach {
@@ -238,9 +278,22 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   def apply(req: Request): Future[Response] = {
     req.params.get("l") match {
       case Some(layers) => {
-        // Restrict dimensions to the range 1-1200
-        val width: Int = math.min(math.max(req.params.getIntOrElse("w", 200), 1), 1200)
-        val height: Int = math.min(math.max(req.params.getIntOrElse("h", 200), 1), 1200)
+        val w: Option[Int] = req.params.getInt("w")
+        val h: Option[Int] = req.params.getInt("h")
+
+        val width: Option[Int] = w match {
+          // Restrict dimensions to the range 1-1200
+          case Some(width) => Some(math.min(math.max(width, 1), 1200))
+          // Ensure at least one dimension has a value
+          case None => if (h.isEmpty) Some(200) else None
+        }
+
+        val height: Option[Int] = h match {
+          // Restrict dimensions to the range 1-1200
+          case Some(height) => Some(math.min(math.max(height, 1), 1200))
+          // Ensure at least one dimension has a value
+          case None => if (w.isEmpty) Some(200) else None
+        }
 
         // Restrict compression to the range 0-100
         val compression: Int = math.min(math.max(req.params.getIntOrElse("c", 98), 0), 100)

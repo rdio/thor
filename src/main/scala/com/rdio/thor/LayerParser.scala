@@ -39,7 +39,7 @@ case class CoverNode(width: Int, height: Int) extends FilterNode
 
 case class LayerNode(path: ImageNode, filter: FilterNode)
 
-class LayerParser(width: Int, height: Int) extends JavaTokenParsers {
+class LayerParser(width: Option[Int], height: Option[Int]) extends JavaTokenParsers {
 
   // number - matches an integer or floating point number
   def number: Parser[Float] = """\d+(\.\d+)?""".r ^^ (_.toFloat)
