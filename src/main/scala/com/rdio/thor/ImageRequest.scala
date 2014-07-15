@@ -24,15 +24,16 @@ import com.typesafe.config.Config
 import org.jboss.netty.handler.codec.http._
 import org.jboss.netty.buffer.ChannelBuffers
 
+// Encapsulates state involved in processing an image request
 class ImageRequest(
   layers: List[LayerNode], // Layers constructed so far
-  fetchedImages: Map[String, Image], // Images fetched so far
-  completedLayers: Array[Image], // Layers with filters applied
+  fetchedImages: Map[String, Image], // Images fetched
+  completedLayers: Array[Image],
   requestWidth: Option[Int],
   requestHeight: Option[Int]
 ) {
 
-  protected lazy val log = Logger.get(this.getClass)
+  lazy val log = Logger.get(this.getClass)
 
   // Try to determine the next layers dimensions from the
   // provided image dimensions and request dimensions
@@ -96,6 +97,8 @@ class ImageRequest(
     }
   }
 
+  // TODO: I'd like to separate this from ImageRequest. It means adding custom
+  // filters requires subclassing request which is messy.
   def applyFilter(image: Image, filter: FilterNode): Option[Image] = {
     filter match {
 
@@ -262,9 +265,14 @@ class ImageRequest(
     }
   }
 
+  // TODO: This is ugly but we need to subclass ImageRequest currently...
+  def iter(completedLayers: Array[Image], width: Option[Int], height: Option[Int]) = {
+    val request = new ImageRequest(layers.tail, fetchedImages, completedLayers, width, height)
+    request()
+  }
+
   // Apply any filters to each image and return the final image
   def apply(): Option[Image] = {
-    // Take the next layer
     layers.headOption match {
       case Some(layer) => {
         layer match {
@@ -278,8 +286,7 @@ class ImageRequest(
                 applyFilter(image.condScaleTo(width, height), filter) match {
                   case Some(filteredImage) => {
                     // Apply the next request with remaining layers and new filtered image
-                    val request = new ImageRequest(layers.tail, fetchedImages, completedLayers :+ filteredImage, Some(width), Some(height))
-                    request()
+                    iter(completedLayers :+ filteredImage, Some(width), Some(height))
                   }
                   case None => {
                     log.error(s"Failed to apply layer filter: $path $filter")
