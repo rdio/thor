@@ -93,9 +93,8 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
             requestImages(paths) map {
               potentialImages => {
                 val fetchedImages = buildImageMap(paths, potentialImages.toArray)
-                val completedLayers = Array.empty[Image]
-
                 val request = requestFactory(layers, fetchedImages, width, height)
+
                 request() match {
                   case Some(image) => buildResponse(req, image, format, compression)
                   case None => Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
