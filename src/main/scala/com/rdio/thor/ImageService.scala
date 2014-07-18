@@ -30,10 +30,9 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   protected def requestFactory(
     layers: List[LayerNode],
     fetchedImages: Map[String, Image],
-    completedLayers: Array[Image],
     requestWidth: Option[Int],
     requestHeight: Option[Int]
-  ) = new ImageRequest(layers, fetchedImages, completedLayers, requestWidth, requestHeight)
+  ) = new ImageRequest(layers, fetchedImages, requestWidth, requestHeight)
 
   // Ensures that any value is clamped between 1 and 1200
   def getDimension(dimension: Option[Int]) = dimension match {
@@ -59,12 +58,10 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   }
 
   // Build a map of paths to images (removing empty paths)
-  def buildImageMap(paths: Array[String], potentialImages: Array[Option[Image]]): Map[String, Image] = {
-    (paths zip potentialImages).toMap.flatMap {
-      case (path, Some(image)) => List((path, image))
-      case (_, None) => List()
-    }
-  }
+  def buildImageMap(paths: Array[String], potentialImages: Array[Option[Image]]): Map[String, Image] =
+    (paths zip potentialImages).toMap.collect({
+      case (path, Some(image)) => path -> image
+    })
 
   // Converts a string format to a Format instance
   def getFormatter(format: Option[String]): Format[ImageWriter] = {
@@ -98,7 +95,7 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
                 val fetchedImages = buildImageMap(paths, potentialImages.toArray)
                 val completedLayers = Array.empty[Image]
 
-                val request = requestFactory(layers, fetchedImages, completedLayers, width, height)
+                val request = requestFactory(layers, fetchedImages, width, height)
                 request() match {
                   case Some(image) => buildResponse(req, image, format, compression)
                   case None => Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND)
