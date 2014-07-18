@@ -89,7 +89,6 @@ class ImageRequest(
           // The size of the empty layer is dependent on the current dimensions
           // and the previous layer dimensions
           val (w, h) = getDimensions(completedLayers.lastOption, width, height)
-          println(s"w: $w, h: $h")
           Image.filled(w, h, Color.BLACK)
         }
       }
@@ -298,7 +297,6 @@ class ImageRequest(
           case Some(image) => {
             // Determine current width/height
             val (w, h) = getDimensions(Some(image), width, height)
-            println(s"w: $w, h: $h")
             Some(image.condScaleTo(w, h))
           }
           case None => None
