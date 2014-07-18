@@ -26,9 +26,8 @@ import org.jboss.netty.buffer.ChannelBuffers
 
 // Encapsulates state involved in processing an image request
 class ImageRequest(
-  layers: List[LayerNode], // Layers constructed so far
+  layers: List[LayerNode],
   fetchedImages: Map[String, Image], // Images fetched
-  completedLayers: Array[Image],
   requestWidth: Option[Int],
   requestHeight: Option[Int]
 ) {
@@ -37,32 +36,32 @@ class ImageRequest(
 
   // Try to determine the next layers dimensions from the
   // provided image dimensions and request dimensions
-  def getDimensions(image: Option[Image]): Tuple2[Int, Int] = {
-    (requestWidth, requestHeight) match {
+  def getDimensions(image: Option[Image], width: Option[Int], height: Option[Int]): Tuple2[Int, Int] = {
+    (width, height) match {
       // Both provided
-      case (Some(width), Some(height)) => (width, height)
+      case (Some(w), Some(h)) => (w, h)
 
       // Width provided
-      case (Some(width), None) => {
+      case (Some(w), None) => {
         image match {
 
           // Image provided
-          case Some(image) => (width, (width.toFloat / image.aspectRatio).toInt)
+          case Some(image) => (w, (w.toFloat / image.aspectRatio).toInt)
 
           // No image to infer aspect ratio
-          case None => (width, width)
+          case None => (w, w)
         }
       }
 
       // Height provided
-      case (None, Some(height)) => {
+      case (None, Some(h)) => {
         image match {
 
           // Image provided
-          case Some(image) => ((image.aspectRatio * height.toFloat).toInt, height)
+          case Some(image) => ((image.aspectRatio * h.toFloat).toInt, h)
 
           // No image to infer aspect ratio
-          case None => (height, height)
+          case None => (h, h)
         }
       }
 
@@ -80,26 +79,25 @@ class ImageRequest(
     }
   }
 
-  def getFilledImage(color: Color = new Color(0, 0, 0, 0)): Image = {
-    // The size of the empty layer is dependent on request dimensions
-    // and the previous layer dimensions
-    val (width, height) = getDimensions(completedLayers.lastOption)
-    Image.filled(width, height, color)
-  }
-
-  def getImage(source: ImageNode): Option[Image] = {
+  def getImage(source: ImageNode, completedLayers: Array[Image], width: Option[Int], height: Option[Int]): Option[Image] = {
     source match {
       case IndexNode(index) if index < completedLayers.length => Some(completedLayers(index))
       case PathNode(path) if fetchedImages.contains(path) => fetchedImages.get(path)
       case PreviousNode() if completedLayers.nonEmpty => Some(completedLayers.last)
-      case EmptyNode() => Some(getFilledImage())
+      case EmptyNode() => {
+        Some {
+          // The size of the empty layer is dependent on the current dimensions
+          // and the previous layer dimensions
+          val (w, h) = getDimensions(completedLayers.lastOption, width, height)
+          println(s"w: $w, h: $h")
+          Image.filled(w, h, Color.BLACK)
+        }
+      }
       case _ => None
     }
   }
 
-  // TODO: I'd like to separate this from ImageRequest. It means adding custom
-  // filters requires subclassing request which is messy.
-  def applyFilter(image: Image, filter: FilterNode): Option[Image] = {
+  def applyFilter(image: Image, filter: FilterNode, completedLayers: Array[Image], width: Option[Int], height: Option[Int]): Option[Image] = {
     filter match {
 
       case LinearGradientNode(degrees, colors, stops) =>
@@ -206,7 +204,7 @@ class ImageRequest(
 
       case GridNode(paths) => {
         val images: List[Image] = paths.flatMap {
-          path => getImage(path)
+          path => getImage(path, completedLayers, width, height)
         }
         if (images.nonEmpty) {
           if (images.length > 1) {
@@ -230,7 +228,7 @@ class ImageRequest(
       case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.Bicubic))
 
       case OverlayNode(overlay) => {
-        getImage(overlay) match {
+        getImage(overlay, completedLayers, width, height) match {
           case Some(overlayImage) => {
             Some(image.filter(OverlayFilter(overlayImage.condScaleTo(image.width, image.height))))
           }
@@ -242,8 +240,8 @@ class ImageRequest(
       }
 
       case MaskNode(overlay, mask) => {
-        val overlayOption = getImage(overlay)
-        val maskOption = getImage(mask)
+        val overlayOption = getImage(overlay, completedLayers, width, height)
+        val maskOption = getImage(mask, completedLayers, width, height)
         (overlayOption, maskOption) match {
           case (Some(overlayImage), Some(maskImage)) => {
             Some {
@@ -265,50 +263,43 @@ class ImageRequest(
     }
   }
 
-  // TODO: This is ugly but we need to subclass ImageRequest currently...
-  def iter(completedLayers: Array[Image], width: Option[Int], height: Option[Int]) = {
-    val request = new ImageRequest(layers.tail, fetchedImages, completedLayers, width, height)
-    request()
-  }
-
   // Apply any filters to each image and return the final image
   def apply(): Option[Image] = {
-    layers.headOption match {
-      case Some(layer) => {
-        layer match {
-          case LayerNode(path: ImageNode, filter: FilterNode) => {
-            getImage(path) match {
-              case Some(image) => {
-                // Determine current width/height
-                val (width, height) = getDimensions(Some(image))
+    layers.foldLeft((Array.empty[Image], requestWidth, requestHeight)) {
+      case ((completedLayers, width, height), LayerNode(source: ImageNode, filter: FilterNode)) => {
+        getImage(source, completedLayers, width, height) match {
+          case Some(image) => {
+            // Determine current width/height
+            val (w, h) = getDimensions(Some(image), width, height)
 
-                // Resize the image before applying filters to do less work
-                applyFilter(image.condScaleTo(width, height), filter) match {
-                  case Some(filteredImage) => {
-                    // Apply the next request with remaining layers and new filtered image
-                    iter(completedLayers :+ filteredImage, Some(width), Some(height))
-                  }
-                  case None => {
-                    log.error(s"Failed to apply layer filter: $path $filter")
-                    None
-                  }
-                }
+            // Resize the image before applying filters to do less work
+            applyFilter(image.condScaleTo(w, h), filter, completedLayers, Some(w), Some(h)) match {
+              case Some(filteredImage) => {
+                // Apply the next request with remaining layers and new filtered image
+                (completedLayers :+ filteredImage, Some(w), Some(h))
               }
               case None => {
-                log.error(s"Failed to get layer source: $path")
-                None
+                log.error(s"Failed to apply layer filter: $source $filter")
+                (completedLayers, width, height)
               }
             }
           }
+          case None => {
+            log.error(s"Failed to get layer source: $source")
+            (completedLayers, width, height)
+          }
         }
       }
-      case None => {
-        // We've run out of layers — apply final resize
+
+    // We've run out of layers — apply final resize
+    } match {
+      case (completedLayers, width, height) => {
         completedLayers.lastOption match {
           case Some(image) => {
             // Determine current width/height
-            val (width, height) = getDimensions(Some(image))
-            Some(image.condScaleTo(width, height))
+            val (w, h) = getDimensions(Some(image), width, height)
+            println(s"w: $w, h: $h")
+            Some(image.condScaleTo(w, h))
           }
           case None => None
         }
