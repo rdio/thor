@@ -224,7 +224,15 @@ class ImageRequest(
         Some(image.filter(RoundCornersFilter(radius)))
       }
 
-      case CoverNode(width, height) => Some(image.cover(width, height, ScaleMethod.Bicubic))
+      case CoverNode() => {
+        val (w, h) = getDimensions(completedLayers.lastOption, requestWidth, requestHeight)
+        Some(image.cover(w, h, ScaleMethod.Bicubic))
+      }
+
+      case FitNode() => {
+        val (w, h) = getDimensions(completedLayers.lastOption, requestWidth, requestHeight)
+        Some(image.fit(w, h, new Color(0, 0, 0, 0), ScaleMethod.Bicubic))
+      }
 
       case OverlayNode(overlay) => {
         getImage(overlay, completedLayers) match {

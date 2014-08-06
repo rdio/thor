@@ -35,7 +35,8 @@ case class RoundCornersNode(radius: Int) extends FilterNode
 case class RoundCornersPercentNode(radius: Float) extends FilterNode
 case class OverlayNode(overlay: ImageNode) extends FilterNode
 case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode
-case class CoverNode(width: Int, height: Int) extends FilterNode
+case class CoverNode() extends FilterNode
+case class FitNode() extends FilterNode
 
 case class LayerNode(source: ImageNode, filter: FilterNode)
 
@@ -236,8 +237,13 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   }
 
   // cover filter
-  def cover: Parser[CoverNode] = "cover(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
-    case width ~ _ ~ height => CoverNode(width, height)
+  def cover: Parser[CoverNode] = "cover()" ^^ {
+    case _ => CoverNode()
+  }
+
+  // fit filter
+  def fit: Parser[FitNode] = "fit()" ^^ {
+    case _ => FitNode()
   }
 
   // all filters
@@ -245,6 +251,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     text | linear | boxblur | boxblurpercent |
     blur | scaleto | zoom | scale |
     grid | round | roundpercent | mask |
+    cover | fit |
     colorize | overlay | pad | padpercent |
     textpercent
 
