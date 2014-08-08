@@ -33,6 +33,8 @@ Querystring Params
         - color stop - `<rgb|rgba> <percentage>%` - supports either rgb or rgba colors
         - color - `rgb(<r>, <g>, <b>)|rgba(<r>, <g>, <b>, <a>)` — specifies a color with values between 0.0-1.0
       - blur - `blur()` - blurs the image using a 3x3 convolution kernel
+      - [fit](https://github.com/sksamuel/scrimage/blob/master/guide/fit.md) - `fit()` - resizes the layer to the request dimensions so that it is the maximum possible size while maintaining aspect ratio
+      - [cover](https://github.com/sksamuel/scrimage/blob/master/guide/cover.md) - `cover()` - resizes the layer to the request dimensions so that it is the minimum size needed without leaving any background visible
       - text - `text("<text>", font, <rgb|rgba>)` - draws the specified text over the center of the image
         - text - text string; must be wrapped in double-quotes
         - font - `<normal|bold|italic> <font-size>px|<font-size>% "<name-string>"` — font declaration
