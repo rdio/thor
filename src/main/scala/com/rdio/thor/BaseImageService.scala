@@ -36,6 +36,7 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
 
   protected lazy val mediaHost: String = conf.getString("IMAGESERVER_MEDIA_HOST")
   protected lazy val mediaPort: Int = conf.getInt("IMAGESERVER_MEDIA_PORT")
+  protected lazy val cacheDays: Int = conf.getInt("CACHE_DURATION_DAYS")
 
   protected lazy val log = Logger.get(this.getClass)
 
@@ -47,13 +48,16 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
     }
 
     val expires: Calendar = Calendar.getInstance()
-    expires.add(Calendar.YEAR, 1)
+    expires.add(Calendar.DATE, cacheDays)
+
+    // 1 year = 1 day in seconds x 365 (max age per rfc)
+    val cacheSeconds = cacheDays * 24 * 60 * 60
 
     val res = Response(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
     res.setHeader(HttpHeaders.Names.ACCESS_CONTROL_ALLOW_ORIGIN, "*")
     res.setHeader(HttpHeaders.Names.CONTENT_TYPE, BaseImageService.getContentType(format))
     res.setHeader(HttpHeaders.Names.CONTENT_LENGTH, bytes.length.toString)
-    res.setHeader(HttpHeaders.Names.CACHE_CONTROL, "max-age=31536000") // 1 year = 1 day in seconds x 365 (max age per rfc)
+    res.setHeader(HttpHeaders.Names.CACHE_CONTROL, s"max-age=$cacheSeconds")
     res.setHeader(HttpHeaders.Names.EXPIRES, Message.httpDateFormat(expires.getTime()))
     res.setContent(ChannelBuffers.wrappedBuffer(bytes))
     res
