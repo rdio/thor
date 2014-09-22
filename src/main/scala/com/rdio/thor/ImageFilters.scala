@@ -33,8 +33,8 @@ class LinearGradientFilter(angle: Float, colors: Array[Color], stops: Array[Floa
     // val transform = AffineTransform.getRotateInstance(theta)
     val start = new Point2D.Float(startX, startY)
     val end = new Point2D.Float(endX, endY)
-    val linearGradient = new LinearGradientPaint(start, end, stops, colors)
 
+    val linearGradient = new LinearGradientPaint(start, end, stops, colors)
     val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
     g2.setPaint(linearGradient)
     g2.fillRect(0, 0, image.width, image.height)
@@ -82,7 +82,19 @@ class MaskFilter(overlay: Image, mask: Image) extends Filter {
   def apply(image: Image) {
     val imageRaster = image.awt.getRaster()
     val overlayRaster = overlay.awt.getRaster()
+
+    // composeThroughMask looks at the opacity of the maskRaster but we're
+    // going to translate that from a grayscale version of the mask where
+    // white is opacity 100% and black opacity 0%
     val maskRaster = mask.awt.getRaster()
+    var pixels:Array[Double] = null
+    pixels = maskRaster.getPixels(0, 0, maskRaster.getWidth(), maskRaster.getHeight(), pixels)
+    for( i <- 0 until pixels.length by 4) {
+        val desaturated = pixels(i) * 0.3 + pixels(i + 1) * 0.59 + pixels(i + 2) * 0.11
+        pixels.update(i + 3, desaturated)
+    }
+    maskRaster.setPixels(0, 0, maskRaster.getWidth(), maskRaster.getHeight(), pixels)
+
     ImageUtils.composeThroughMask(overlayRaster, imageRaster, maskRaster)
   }
 }
