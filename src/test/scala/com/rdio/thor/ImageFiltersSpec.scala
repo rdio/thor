@@ -82,4 +82,19 @@ class ImageFiltersSpec extends BaseSpec {
     pixel.blue should be (227)
     pixel.alpha should be (255)
   }
+
+  "MaskFilter" should "leave the mask layer untouched" in {
+    val img = Image.filled(5, 5, new Color(0, 0, 255, 255))
+    val overlay = Image.filled(5, 5, new Color(255, 0, 0, 255))
+    var mask = Image.filled(5, 5, new Color(27, 200, 93, 255))
+    val filter = new MaskFilter(overlay: Image, mask: Image)
+    filter(img)
+
+    var pixel = new Pixel(mask.pixels(0))
+
+    pixel.red should be (27)
+    pixel.green should be (200)
+    pixel.blue should be (93)
+    pixel.alpha should be (255)
+  }
 }

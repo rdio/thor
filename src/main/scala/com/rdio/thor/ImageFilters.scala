@@ -86,10 +86,13 @@ class MaskFilter(overlay: Image, mask: Image) extends Filter {
     // composeThroughMask looks at the opacity of the maskRaster but we're
     // going to translate that from a grayscale version of the mask where
     // white is opacity 100% and black opacity 0%
-    val maskRaster = mask.awt.getRaster()
+    // Copying the image so we don't desaturate the actual mask layer
+    val maskCopy = mask.copy
+    val maskRaster = maskCopy.awt.getRaster()
     var pixels:Array[Double] = null
     pixels = maskRaster.getPixels(0, 0, maskRaster.getWidth(), maskRaster.getHeight(), pixels)
     for( i <- 0 until pixels.length by 4) {
+        // common grayscale equation. See http://www.thewonderoflight.com/articles/definitive-guide-to-bw-conversion/
         val desaturated = pixels(i) * 0.3 + pixels(i + 1) * 0.59 + pixels(i + 2) * 0.11
         pixels.update(i + 3, desaturated)
     }
