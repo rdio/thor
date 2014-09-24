@@ -31,7 +31,7 @@ Querystring Params
     - filter - `<filter-name>([args])` - filter to apply to the current layer or if no source was provided, the previous layer
       - linear gradient - `linear(<angle>, <color-stop>, <color-stop> [, <color-stop>]+)` - applies a linear gradient over the layer at `<angle>` degrees with _at least_ two color stops
         - color stop - `<rgb|rgba> <percentage>%` - supports either rgb or rgba colors
-        - color - `rgb(<r>, <g>, <b>)|rgba(<r>, <g>, <b>, <a>)` — specifies a color with values between 0.0-1.0
+        - color - `rgb(<r>, <g>, <b>)|rgba(<r>, <g>, <b>, <a>)` — specifies a color with values between 0.0-1.0.
       - blur - `blur()` - blurs the image using a 3x3 convolution kernel
       - [fit](https://github.com/sksamuel/scrimage/blob/master/guide/fit.md) - `fit()` - resizes the layer to the request dimensions so that it is the maximum possible size while maintaining aspect ratio
       - [cover](https://github.com/sksamuel/scrimage/blob/master/guide/cover.md) - `cover()` - resizes the layer to the request dimensions so that it is the minimum size needed without leaving any background visible
@@ -47,7 +47,7 @@ Querystring Params
       - pad - `pad(<padding-pixels>px|<padding-percent>%)` - applies padding around the image by `padding-pixels`
       - colorize - `colorize(<color>)` - overlays the specified `color` over the image
       - overlay - `overlay(<source>)` - overlays the specified `source` over the image
-      - mask - `mask(<overlay-source>, <mask-source>)` - blends between the layer and `overlay-source` using `mask-source` as a guide
+      - mask - `mask(<overlay-source>, <mask-source>)` - blends between the layer and `overlay-source` using `mask-source` as a guide, where white in the mask reveals the overlay and black reveals the layer
 
 Examples
 ---
