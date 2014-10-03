@@ -1,0 +1,27 @@
+FROM    ubuntu:latest
+RUN     apt-get -y update
+RUN     apt-get -y install openjdk-7-jre-headless
+RUN     echo "#!/bin/sh" > /run.sh
+RUN     echo exec /usr/bin/java\
+ -DIMAGESERVER_PORT=\$IMAGESERVER_PORT\
+ -DIMAGESERVER_MEDIA_HOST=\$IMAGESERVER_MEDIA_HOST\
+ -DIMAGESERVER_MEDIA_PORT=\$IMAGESERVER_MEDIA_PORT\
+ -DHOST_CONNECTION_LIMIT=\$HOST_CONNECTION_LIMIT\
+ -DCACHE_DURATION_DAYS=\$CACHE_DURATION_DAYS\
+ -DTCP_CONNECT_TIMEOUT=\$TCP_CONNECT_TIMEOUT\
+ -jar /thor.jar >> /run.sh
+RUN     chmod +x /run.sh
+
+ADD     ./thor.jar /thor.jar
+
+EXPOSE  8080
+
+ENV     IMAGESERVER_PORT 8080
+ENV     IMAGESERVER_MEDIA_HOST localhost
+ENV     IMAGESERVER_MEDIA_PORT 8000
+ENV     HOST_CONNECTION_LIMIT 100
+ENV     CACHE_DURATION_DAYS 365
+ENV     TCP_CONNECT_TIMEOUT 350
+ENV     JAVA_OPTS -server -Xmx512m -XX:MaxPermSize=128m
+
+CMD     ["/run.sh"]
