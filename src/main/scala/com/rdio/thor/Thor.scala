@@ -21,6 +21,7 @@ object Thor extends App {
       conf.getString("IMAGESERVER_MEDIA_HOST"),
       conf.getInt("IMAGESERVER_MEDIA_PORT")))
     .hostConnectionLimit(conf.getInt("HOST_CONNECTION_LIMIT"))
+    .tcpConnectTimeout(conf.getInt("TCP_CONNECT_TIMEOUT").millis)
     .name("thor-client")
     .build()
 
