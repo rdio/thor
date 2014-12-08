@@ -17,6 +17,7 @@ import com.twitter.conversions.time._
 import com.twitter.finagle.Service
 import com.twitter.finagle.builder.ClientBuilder
 import com.twitter.finagle.http.{Http, Status, RichHttp, Request, Response, Message}
+import com.twitter.finagle.stats.ServerStatsReceiver
 import com.twitter.logging.Logger
 import com.twitter.util.{Await, Future}
 import com.typesafe.config.Config
@@ -272,12 +273,14 @@ class ImageRequest(
 
   // Apply any filters to each image and return the final image
   def apply(): Option[Image] = {
+    val statsReceiver = ServerStatsReceiver
+
     layers.foldLeft((Array.empty[Image])) {
       case ((completedLayers), LayerNode(source: ImageNode, filter: FilterNode)) => {
         getImage(source, completedLayers) match {
           case Some(image) => {
             // Resize the image before applying filters to do less work
-            applyFilter(image, filter, completedLayers) match {
+            statsReceiver.time("filter", filter.toString()) { applyFilter(image, filter, completedLayers) } match {
               case Some(filteredImage) => {
                 // Apply the next request with remaining layers and new filtered image
                 (completedLayers :+ filteredImage)
@@ -302,7 +305,7 @@ class ImageRequest(
           case Some(image) => {
             // Determine current width/height
             val (w, h) = getDimensions(Some(image), requestWidth, requestHeight)
-            Some(image.condScaleTo(w, h))
+            Some(statsReceiver.time("filter", "condscaleto") { image.condScaleTo(w, h) })
           }
           case None => None
         }

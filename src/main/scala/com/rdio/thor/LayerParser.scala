@@ -17,26 +17,26 @@ case class IndexNode(index: Int) extends ImageNode
 case class PreviousNode() extends ImageNode
 
 trait FilterNode{}
-case class NoopNode() extends FilterNode
-case class LinearGradientNode(degrees: Float, colors: List[Color], stops: List[Float]) extends FilterNode
-case class BlurNode() extends FilterNode
-case class BoxBlurNode(hRadius: Int, vRadius: Int) extends FilterNode
-case class BoxBlurPercentNode(hRadius: Float, vRadius: Float) extends FilterNode
-case class ColorizeNode(color: Color) extends FilterNode
-case class ScaleNode(percentage: Float) extends FilterNode
-case class ZoomNode(percentage: Float) extends FilterNode
-case class ScaleToNode(width: Int, height: Int) extends FilterNode
-case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode
-case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode
-case class GridNode(paths: List[ImageNode]) extends FilterNode
-case class PadNode(padding: Int) extends FilterNode
-case class PadPercentNode(padding: Float) extends FilterNode
-case class RoundCornersNode(radius: Int) extends FilterNode
-case class RoundCornersPercentNode(radius: Float) extends FilterNode
-case class OverlayNode(overlay: ImageNode) extends FilterNode
-case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode
-case class CoverNode() extends FilterNode
-case class FitNode() extends FilterNode
+case class NoopNode() extends FilterNode { override def toString = "noop" }
+case class LinearGradientNode(degrees: Float, colors: List[Color], stops: List[Float]) extends FilterNode { override def toString = "lineargradient" }
+case class BlurNode() extends FilterNode { override def toString = "blur" }
+case class BoxBlurNode(hRadius: Int, vRadius: Int) extends FilterNode { override def toString = "boxblur" }
+case class BoxBlurPercentNode(hRadius: Float, vRadius: Float) extends FilterNode { override def toString = "boxblurpercent" }
+case class ColorizeNode(color: Color) extends FilterNode { override def toString = "colorize" }
+case class ScaleNode(percentage: Float) extends FilterNode { override def toString = "scale" }
+case class ZoomNode(percentage: Float) extends FilterNode { override def toString = "zoom" }
+case class ScaleToNode(width: Int, height: Int) extends FilterNode { override def toString = "scaleto" }
+case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode { override def toString = "text" }
+case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode { override def toString = "textpercent" }
+case class GridNode(paths: List[ImageNode]) extends FilterNode { override def toString = "grid" }
+case class PadNode(padding: Int) extends FilterNode { override def toString = "pad" }
+case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
+case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
+case class RoundCornersPercentNode(radius: Float) extends FilterNode { override def toString = "roundcornerspercent" }
+case class OverlayNode(overlay: ImageNode) extends FilterNode { override def toString = "overlay" }
+case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode { override def toString = "mask" }
+case class CoverNode() extends FilterNode { override def toString = "cover" }
+case class FitNode() extends FilterNode { override def toString = "fit" }
 
 case class LayerNode(source: ImageNode, filter: FilterNode)
 
