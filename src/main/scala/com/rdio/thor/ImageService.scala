@@ -79,7 +79,6 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   def apply(req: Request): Future[Response] = {
     req.params.get("l") match {
       case Some(layers) => {
-
         // Gather parameters
         val (width, height) = getDimensions(req.params.getInt("w"), req.params.getInt("h"))
         val compression = getCompression(req.params.getInt("c"))
@@ -103,14 +102,27 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
             }
           }
           case unsuccess: parser.NoSuccess => {
-            log.error(s"Failed to parse layers: $layers - ${unsuccess.msg}")
-            Future.value(Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND))
+            log.error(s"Failed to parse layers: $layers – ${unsuccess.toString}")
+
+            val resp = Response(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST)
+            val parseErrPretty = unsuccess.toString.replace("^", """<span style="color: hsl(20, 100%, 50%); font-weight: 900;">^</span>""")
+            resp.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/html")
+            resp.write(
+              s"""
+              <p style="font-family: Helvetica; padding: 20px; margin-bottom: 2px; background-color: hsl(0, 0%, 80%)">Failed to parse layers: $layers</p>
+              <pre style="padding: 32px; margin-top: 2px; background-color: hsl(0,0%,90%);"><code>${parseErrPretty}</code></pre>
+              """)
+            Future.value(resp)
           }
         }
       }
       case None => {
         log.error(s"No layers found in request: ${req.uri}")
-        Future.value(Response(HttpVersion.HTTP_1_1, HttpResponseStatus.NOT_FOUND))
+
+        val resp = Response(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_REQUEST)
+        resp.setHeader(HttpHeaders.Names.CONTENT_TYPE, "text/html")
+        resp.write(s"<p>No layers found in request: ${req.uri}</p>")
+        Future.value(resp)
       }
     }
   }

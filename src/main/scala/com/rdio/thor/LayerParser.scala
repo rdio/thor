@@ -42,51 +42,75 @@ case class LayerNode(source: ImageNode, filter: FilterNode)
 
 class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParsers {
 
+  // helper for debugging user errors in input strings
+  def nameParser[T](parserName: String)(p: => Parser[T]) = Parser{ in =>
+    p(in) match {
+      case Failure(msg, next) => Failure(s"Error parsing `${parserName}`. ${msg}", next)
+      case other => other
+    }
+  }.named(parserName)
+
   // number - matches an integer or floating point number
+  // e.g. `3.14159`
   def number: Parser[Float] = """\d+(\.\d+)?""".r ^^ (_.toFloat)
 
   // integer - matches an integer
+  // e.g. `42`
   def integer: Parser[Int] = """\d+""".r ^^ (_.toInt)
 
   // degrees - matches a numerical degree
+  // e.g. `90deg`
   def degrees: Parser[Float] = number <~ "deg" ^^ {
     case degrees => (degrees % 360)
   }
 
   // percent - matches a percentage number
+  // e.g. `14%`
   def percent: Parser[Float] = number <~ "%" ^^ {
     case percentage => math.min(math.max(percentage / 100.0f, 0.0f), 1.0f)
   }
 
   // pixels - matches a pixel-unit number
+  // e.g. `23px`
   def pixels: Parser[Int] = integer <~ "px"
 
   // path - matches a valid url path
+  // e.g. `this-is-an/img.jpg`
+  //
+  // for those unfamiliar with java's regexps,
+  // http://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
+  // so, `\w` does not mean "match whitespace"
   def path: Parser[PathNode] = """[\w\-\/\.%]+""".r ^^ {
     case path => PathNode(path)
   }
 
   // empty - matches an empty image placeholder
+  // e.g. `_`
   def empty: Parser[EmptyNode] = "_" ^^ {
     case _ => EmptyNode()
   }
 
+  // e.g. `bold`
   def fontStyle: Parser[Int] = """bold|italic|normal""".r ^^ {
     case "normal" => 0
     case "bold" => 1
     case "italic" => 2
   }
 
+  // this makes no sense to me... it seems to match
+  // e.g. `bolditalic`
   def fontStyles: Parser[Int] = rep1(fontStyle) ^^ { styles =>
     // Sum the styles to a maximum of 3
     math.min(styles.reduceLeft((styles, style) => styles + style), 3)
   }
 
+  // e.g. `"blah"`
   def string: Parser[String] = stringLiteral ^^ { string =>
     string.stripPrefix("\"").stripSuffix("\"")
   }
 
   // font - matches a font
+  // e.g. `bold14pxHelvetica`
   def font: Parser[FontNode] = (fontStyles?) ~ (pixels?) ~ string ^^ {
     case maybeStyle ~ maybeSize ~ family => {
       val style: Int = maybeStyle.getOrElse(Font.PLAIN)
@@ -95,6 +119,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     }
   }
 
+  // e.g. `bold50%Courier`
   def fontpercent: Parser[FontPercentNode] = (fontStyles?) ~ (percent?) ~ string ^^ {
     case maybeStyle ~ maybePercentage ~ family => {
       val style: Int = maybeStyle.getOrElse(Font.PLAIN)
@@ -104,6 +129,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   }
 
   // placeholder - matches an image placeholder
+  // e.g. `$1`
   def placeholder: Parser[IndexNode] = "$" ~ integer ^^ {
     case _ ~ index => IndexNode(index)
   }
@@ -112,6 +138,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def source: Parser[ImageNode] = empty | path | placeholder
 
   // rgba - matches an rgba color with alpha
+  // e.g. `rgba(0.5,0.5,0.5,1.0)`
   def rgba: Parser[Color] = "rgba(" ~> repsep(number, ",") <~ ")" ^^ {
     case List(r, g, b, a) => {
       val cr = math.min(math.max(r, 0.0), 1.0)
@@ -124,6 +151,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   }
 
   // rgb - matches an rgb color
+  // e.g. `rgb(0.5,0.5,0.5)`
   def rgb: Parser[Color] = "rgb(" ~> repsep(number, ",") <~ ")" ^^ {
     case List(r, g, b) => {
       val cr = math.min(math.max(r, 0.0), 1.0)
@@ -138,113 +166,133 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def color: Parser[Color] = rgba | rgb
 
   // colorStop - matches a color+number pair
+  // e.g. `rgb(0.5,0.5,0.5)50%`
   def colorStop: Parser[ColorStop] = color ~ percent ^^ {
     case color ~ number => ColorStop(color, number)
   }
 
   // linear gradient filter
-  def linear: Parser[LinearGradientNode] = "linear(" ~> degrees ~ "," ~ rep1sep(colorStop, ",") <~ ")" ^? {
-    case degrees ~ _ ~ colorStops if colorStops.length > 1 => {
-      // We sort the stops because LinearGradientPaint requires it
-      val sortedColorStops = colorStops.sortBy {
-        case ColorStop(color, stop) => stop
+  def linear: Parser[LinearGradientNode] = nameParser("linear(degrees,<csv list of colorStops>)")(
+    "linear(" ~> degrees ~ "," ~ rep1sep(colorStop, ",") <~ ")" ^? {
+      case degrees ~ _ ~ colorStops if colorStops.length > 1 => {
+        // We sort the stops because LinearGradientPaint requires it
+        val sortedColorStops = colorStops.sortBy {
+          case ColorStop(color, stop) => stop
+        }
+        val stops = sortedColorStops.map {
+          case ColorStop(color, stop) => stop
+        }
+        val colors = sortedColorStops.map {
+          case ColorStop(color, stop) => color
+        }
+        LinearGradientNode(degrees, colors, stops)
       }
-      val stops = sortedColorStops.map {
-        case ColorStop(color, stop) => stop
-      }
-      val colors = sortedColorStops.map {
-        case ColorStop(color, stop) => color
-      }
-      LinearGradientNode(degrees, colors, stops)
-    }
-  }
+    })
 
   // blur filter
-  def blur: Parser[BlurNode] = "blur()" ^^ {
-    case _ => BlurNode()
-  }
+  def blur: Parser[BlurNode] = nameParser("blur()")(
+    "blur()" ^^ {
+      case _ => BlurNode()
+    })
 
   // box blur filter
-  def boxblur: Parser[BoxBlurNode] = "boxblur(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
-    case hRadius ~ _ ~ vRadius => BoxBlurNode(hRadius, vRadius)
-  }
+  def boxblur: Parser[BoxBlurNode] = nameParser("boxblur(pixels,pixels)")(
+    "boxblur(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
+      case hRadius ~ _ ~ vRadius => BoxBlurNode(hRadius, vRadius)
+    })
 
-  def boxblurpercent: Parser[BoxBlurPercentNode] = "boxblur(" ~> percent ~ "," ~ percent <~ ")" ^^ {
-    case hPercent ~ _ ~ vPercent => BoxBlurPercentNode(hPercent, vPercent)
-  }
+  def boxblurpercent: Parser[BoxBlurPercentNode] = nameParser("boxblur(percent,percent)")(
+    "boxblur(" ~> percent ~ "," ~ percent <~ ")" ^^ {
+      case hPercent ~ _ ~ vPercent => BoxBlurPercentNode(hPercent, vPercent)
+    })
 
   // colorize filter
-  def colorize: Parser[ColorizeNode] = "colorize(" ~> color <~ ")" ^^ {
-    case color => ColorizeNode(color)
-  }
+  def colorize: Parser[ColorizeNode] = nameParser("colorize(color)")(
+    "colorize(" ~> color <~ ")" ^^ {
+      case color => ColorizeNode(color)
+    })
 
   // zoom filter
-  def zoom: Parser[ZoomNode] = "zoom(" ~> percent <~ ")" ^^ {
-    case percentage => ZoomNode(percentage)
-  }
+  def zoom: Parser[ZoomNode] = nameParser("zoom(percent)")(
+    "zoom(" ~> percent <~ ")" ^^ {
+      case percentage => ZoomNode(percentage)
+    })
 
   // scale filter
-  def scale: Parser[ScaleNode] = "scale(" ~> percent <~ ")" ^^ {
-    case percentage => ScaleNode(percentage)
-  }
+  def scale: Parser[ScaleNode] = nameParser("scale(percent)")(
+    "scale(" ~> percent <~ ")" ^^ {
+      case percentage => ScaleNode(percentage)
+    })
 
   // scaleto filter
-  def scaleto: Parser[ScaleToNode] = "scaleto(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
-    case width ~ _ ~ height => ScaleToNode(width, height)
-  }
+  def scaleto: Parser[ScaleToNode] = nameParser("scaleto(pixels,pixels)")(
+    "scaleto(" ~> pixels ~ "," ~ pixels <~ ")" ^^ {
+      case width ~ _ ~ height => ScaleToNode(width, height)
+    })
 
   // grid filter
-  def grid: Parser[GridNode] = "grid(" ~> repsep(source, ",") <~ ")" ^^ {
-    case paths => GridNode(paths)
-  }
+  def grid: Parser[GridNode] = nameParser("grid(<csv list of urls>)")(
+    "grid(" ~> repsep(source, ",") <~ ")" ^^ {
+      case paths => GridNode(paths)
+    })
 
   // text filter
-  def text: Parser[TextNode] = "text(" ~> string ~ "," ~ font ~ "," ~ color <~ ")" ^^ {
-    case text ~ _ ~ font ~ _ ~ color => TextNode(text, font, color)
-  }
+  def text: Parser[TextNode] = nameParser("text(string,font,color)")(
+    "text(" ~> string ~ "," ~ font ~ "," ~ color <~ ")" ^^ {
+      case text ~ _ ~ font ~ _ ~ color => TextNode(text, font, color)
+    })
 
   // textpercent filter
-  def textpercent: Parser[TextPercentNode] = "text(" ~> string ~ "," ~ fontpercent ~ "," ~ color <~ ")" ^^ {
-    case text ~ _ ~ fontpercent ~ _ ~ color => TextPercentNode(text, fontpercent, color)
-  }
+  def textpercent: Parser[TextPercentNode] = nameParser("text(string,fontpercent,color)")(
+    "text(" ~> string ~ "," ~ fontpercent ~ "," ~ color <~ ")" ^^ {
+      case text ~ _ ~ fontpercent ~ _ ~ color => TextPercentNode(text, fontpercent, color)
+    })
 
   // round filter
-  def round: Parser[RoundCornersNode] = "round(" ~> pixels <~ ")" ^^ {
-    case radius => RoundCornersNode(radius)
-  }
+  def round: Parser[RoundCornersNode] = nameParser("round(pixels)")(
+    "round(" ~> pixels <~ ")" ^^ {
+      case radius => RoundCornersNode(radius)
+    })
 
-  def roundpercent: Parser[RoundCornersPercentNode] = "round(" ~> percent <~ ")" ^^ {
-    case percent => RoundCornersPercentNode(percent)
-  }
+  def roundpercent: Parser[RoundCornersPercentNode] = nameParser("round(percent)")(
+    "round(" ~> percent <~ ")" ^^ {
+      case percent => RoundCornersPercentNode(percent)
+    })
 
   // mask filter
-  def mask: Parser[MaskNode] = "mask(" ~> source ~ "," ~ source <~ ")" ^^ {
-    case overlay ~ _ ~ mask => MaskNode(overlay, mask)
-  }
+  def mask: Parser[MaskNode] = nameParser("mask(url,url)")(
+    "mask(" ~> source ~ "," ~ source <~ ")" ^^ {
+      case overlay ~ _ ~ mask => MaskNode(overlay, mask)
+    })
 
   // overlay filter
-  def overlay: Parser[OverlayNode] = "overlay(" ~> source <~ ")" ^^ {
-    case overlay => OverlayNode(overlay)
-  }
+  def overlay: Parser[OverlayNode] = nameParser("overlay(url)")(
+    "overlay(" ~> source <~ ")" ^^ {
+      case overlay => OverlayNode(overlay)
+    })
 
   // pad filter
-  def pad: Parser[PadNode] = "pad(" ~> pixels <~ ")" ^^ {
-    case padding => PadNode(padding)
-  }
+  def pad: Parser[PadNode] = nameParser("pad(pixels)")(
+    "pad(" ~> pixels <~ ")" ^^ {
+      case padding => PadNode(padding)
+    })
 
-  def padpercent: Parser[PadPercentNode] = "pad(" ~> percent <~ ")" ^^ {
-    case percent => PadPercentNode(percent)
-  }
+  def padpercent: Parser[PadPercentNode] = nameParser("pad(percent)")(
+    "pad(" ~> percent <~ ")" ^^ {
+      case percent => PadPercentNode(percent)
+    })
 
   // cover filter
-  def cover: Parser[CoverNode] = "cover()" ^^ {
-    case _ => CoverNode()
-  }
+  def cover: Parser[CoverNode] = nameParser("cover()")(
+    "cover()" ^^ {
+      case _ => CoverNode()
+    })
 
   // fit filter
-  def fit: Parser[FitNode] = "fit()" ^^ {
-    case _ => FitNode()
-  }
+  def fit: Parser[FitNode] = nameParser("fit()")(
+    "fit()" ^^ {
+      case _ => FitNode()
+    })
 
   // all filters
   def filters: Parser[FilterNode] =
@@ -255,18 +303,30 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     colorize | overlay | pad | padpercent |
     textpercent
 
-  // layer - matches a single layer
-  def layer: Parser[LayerNode] =
-    // Match a path without filters
+  // Match a path without filters
+  def sourcelayer = nameParser("sourcelayer")(
     source ^^ ({
       case p => LayerNode(p, NoopNode())
-    }) ||| // or, match a path or placeholder with filters
+    })
+  )
+
+  // Match a path or placeholder with filters
+  def sourcewithfilter = nameParser("sourcewithfilter")(
     source ~ ":" ~ filters ^^ ({
       case p ~ _ ~ f => LayerNode(p, f)
-    }) ||| // or, match just a filter
+    })
+  )
+
+  // Match just a filter
+  def filterlayer = nameParser("filterlayer")(
     filters ^^ ({
       case f => LayerNode(PreviousNode(), f)
     })
+  )
+
+  // layer - matches a single layer
+  def layer: Parser[LayerNode] =
+    sourcelayer ||| sourcewithfilter ||| filterlayer
 
   // layers - matches all layers
   def layers: Parser[List[LayerNode]] = rep1sep(layer, ";")
