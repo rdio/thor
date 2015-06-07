@@ -10,23 +10,24 @@ import com.twitter.finagle.http.{Http, RichHttp, Request, Response}
 import com.typesafe.config.{Config, ConfigFactory}
 
 import org.jboss.netty.handler.codec.http._
+import collection.JavaConversions._
 
 /** Main entry-point for the server. Builds the request-response flow and starts the server. */
 object Thor extends App {
   val conf: Config = ConfigFactory.load()
 
-  val client = ClientBuilder()
-    .codec(RichHttp[Request](Http()))
-    .hosts(new InetSocketAddress(
-      conf.getString("IMAGESERVER_MEDIA_HOST"),
-      conf.getInt("IMAGESERVER_MEDIA_PORT")))
-    .hostConnectionLimit(conf.getInt("HOST_CONNECTION_LIMIT"))
-    .name("thor-client")
-    .build()
+  val clients = conf.getStringList("IMAGESERVER_ALLOWED_HOSTS").map { (url: String) =>
+    (url, ClientBuilder()
+      .codec(RichHttp[Request](Http()))
+      .hosts(url)
+      .hostConnectionLimit(conf.getInt("HOST_CONNECTION_LIMIT"))
+      .name("thor-client")
+      .build())
+  }.toMap
 
   val server = ServerBuilder()
     .codec(RichHttp[Request](Http()))
     .bindTo(new InetSocketAddress(conf.getInt("IMAGESERVER_PORT")))
     .name("thor-server")
-    .build(new ImageService(conf, client))
+    .build(new ImageService(conf, clients))
 }

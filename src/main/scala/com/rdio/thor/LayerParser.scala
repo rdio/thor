@@ -1,6 +1,7 @@
 package com.rdio.thor
 
 import java.awt.{Color, Font}
+import java.net.URL
 
 import scala.math
 import scala.util.parsing.combinator._
@@ -12,7 +13,7 @@ case class FontPercentNode(family: String = "Helvetica", size: Float = 1.0f, sty
 
 trait ImageNode{}
 case class EmptyNode() extends ImageNode
-case class PathNode(path: String) extends ImageNode
+case class UrlNode(url: URL) extends ImageNode
 case class IndexNode(index: Int) extends ImageNode
 case class PreviousNode() extends ImageNode
 
@@ -28,7 +29,7 @@ case class ZoomNode(percentage: Float) extends FilterNode { override def toStrin
 case class ScaleToNode(width: Int, height: Int) extends FilterNode { override def toString = "scaleto" }
 case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode { override def toString = "text" }
 case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode { override def toString = "textpercent" }
-case class GridNode(paths: List[ImageNode]) extends FilterNode { override def toString = "grid" }
+case class GridNode(urls: List[ImageNode]) extends FilterNode { override def toString = "grid" }
 case class PadNode(padding: Int) extends FilterNode { override def toString = "pad" }
 case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
 case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
@@ -74,14 +75,9 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   // e.g. `23px`
   def pixels: Parser[Int] = integer <~ "px"
 
-  // path - matches a valid url path
-  // e.g. `this-is-an/img.jpg`
-  //
-  // for those unfamiliar with java's regexps,
-  // http://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
-  // so, `\w` does not mean "match whitespace"
-  def path: Parser[PathNode] = """[\w\-\/\.%]+""".r ^^ {
-    case path => PathNode(path)
+  // url - matches a valid url
+  def url: Parser[UrlNode] = "\\b((?:https?)://[-a-zA-Z0-9+&@#/%?=~_|!,.]*[-a-zA-Z0-9+&@#/%=~_|])".r ^^ {
+    case url => UrlNode(new URL(url))
   }
 
   // empty - matches an empty image placeholder
@@ -134,8 +130,8 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     case _ ~ index => IndexNode(index)
   }
 
-  // source - matches either a path or image placeholder
-  def source: Parser[ImageNode] = empty | path | placeholder
+  // source - matches either a url or image placeholder
+  def source: Parser[ImageNode] = empty | url | placeholder
 
   // rgba - matches an rgba color with alpha
   // e.g. `rgba(0.5,0.5,0.5,1.0)`
@@ -233,7 +229,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   // grid filter
   def grid: Parser[GridNode] = nameParser("grid(<csv list of urls>)")(
     "grid(" ~> repsep(source, ",") <~ ")" ^^ {
-      case paths => GridNode(paths)
+      case urls => GridNode(urls)
     })
 
   // text filter
@@ -303,14 +299,14 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     colorize | overlay | pad | padpercent |
     textpercent
 
-  // Match a path without filters
+  // Match a url without filters
   def sourcelayer = nameParser("sourcelayer")(
     source ^^ ({
       case p => LayerNode(p, NoopNode())
     })
   )
 
-  // Match a path or placeholder with filters
+  // Match a url or placeholder with filters
   def sourcewithfilter = nameParser("sourcewithfilter")(
     source ~ ":" ~ filters ^^ ({
       case p ~ _ ~ f => LayerNode(p, f)

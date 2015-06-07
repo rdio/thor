@@ -2,7 +2,7 @@ package com.rdio.thor
 
 import java.awt.Color
 import java.io.{File, FileInputStream}
-import java.net.InetSocketAddress
+import java.net.URL
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
@@ -32,10 +32,8 @@ object BaseImageService {
   }
 }
 
-abstract class BaseImageService(conf: Config, client: Service[Request, Response]) extends Service[Request, Response] {
+abstract class BaseImageService(conf: Config, clients: Map[String, Service[Request, Response]]) extends Service[Request, Response] {
 
-  protected lazy val mediaHost: String = conf.getString("IMAGESERVER_MEDIA_HOST")
-  protected lazy val mediaPort: Int = conf.getInt("IMAGESERVER_MEDIA_PORT")
   protected lazy val cacheDays: Int = conf.getInt("CACHE_DURATION_DAYS")
 
   protected lazy val log = Logger.get(this.getClass)
@@ -63,24 +61,29 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
     res
   }
 
-  def requestImage(url: String): Future[Option[Image]] = {
-    val req = Request("/" + url)
+  def requestImage(url: URL): Future[Option[Image]] = {
+    val req = Request(url.toString())
+    val host = url.getHost() + ":" + (if (url.getPort() == -1) url.getDefaultPort() else url.getPort())
     req.userAgent = "Thor-Imageserver"
-    req.host = s"$mediaHost:$mediaPort"
+    req.host = host
     req.accept = "image/*"
-    client(req) map {
-      res => res.status match {
-        case Status.Ok => {
-          Some(res.withInputStream[Image](inputStream => Image(inputStream)))
-        }
-        case _ => {
-          log.error(s"Could not fetch: $url (${res.status})")
-          None
+    println(host)
+    clients.get(host) match {
+      case None => Future.value(None)
+      case Some(client) => client(req) map {
+        res => res.status match {
+          case Status.Ok => {
+            Some(res.withInputStream[Image](inputStream => Image(inputStream)))
+          }
+          case _ => {
+            log.error(s"Could not fetch: $url (${res.status})")
+            None
+          }
         }
       }
     }
   }
 
-  def requestImages(urls: Array[String]): Future[Seq[Option[Image]]] =
+  def requestImages(urls: Array[URL]): Future[Seq[Option[Image]]] =
     Future.collect(urls map requestImage)
 }
