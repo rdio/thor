@@ -1,7 +1,6 @@
 package com.rdio.thor
 
 import java.awt.{Color, Font}
-import java.net.URL
 
 import scala.math
 import scala.util.parsing.combinator._
@@ -13,7 +12,7 @@ case class FontPercentNode(family: String = "Helvetica", size: Float = 1.0f, sty
 
 trait ImageNode{}
 case class EmptyNode() extends ImageNode
-case class UrlNode(url: URL) extends ImageNode
+case class UrlNode(url: String) extends ImageNode
 case class IndexNode(index: Int) extends ImageNode
 case class PreviousNode() extends ImageNode
 
@@ -76,8 +75,8 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def pixels: Parser[Int] = integer <~ "px"
 
   // url - matches a valid url
-  def url: Parser[UrlNode] = "\\b((?:https?)://[-a-zA-Z0-9+&@#/%?=~_|!,.]*[-a-zA-Z0-9+&@#/%=~_|])".r ^^ {
-    case url => UrlNode(new URL(url))
+  def url: Parser[UrlNode] = """(\b((?:https?)://[-a-zA-Z0-9+&@#/%?=~_|!,.]*[-a-zA-Z0-9+&@#/%=~_|])|[\w\-\/\.%]+)""".r ^^ {
+    case url => UrlNode(url)
   }
 
   // empty - matches an empty image placeholder

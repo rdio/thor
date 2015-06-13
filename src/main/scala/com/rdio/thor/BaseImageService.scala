@@ -2,8 +2,8 @@ package com.rdio.thor
 
 import java.awt.Color
 import java.io.{File, FileInputStream}
-import java.net.URL
 import java.util.{Calendar, Date}
+import java.net.URL
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -61,13 +61,21 @@ abstract class BaseImageService(conf: Config, clients: Map[String, Service[Reque
     res
   }
 
-  def requestImage(url: URL): Future[Option[Image]] = {
+  def requestImage(urlOrPath: String): Future[Option[Image]] = {
+    val url = if (urlOrPath.startsWith("http")) {
+      new URL(urlOrPath)
+    } else {
+      if (clients.size > 1) {
+        log.error(s"$urlOrPath has no domain and more than one client configured, picking randomly, good luck!")
+      }
+      new URL("http://" + clients.keys.head + "/" + urlOrPath)
+    }
+
     val req = Request(url.toString())
     val host = url.getHost() + ":" + (if (url.getPort() == -1) url.getDefaultPort() else url.getPort())
     req.userAgent = "Thor-Imageserver"
     req.host = host
     req.accept = "image/*"
-    println(host)
     clients.get(host) match {
       case None => Future.value(None)
       case Some(client) => client(req) map {
@@ -84,6 +92,6 @@ abstract class BaseImageService(conf: Config, clients: Map[String, Service[Reque
     }
   }
 
-  def requestImages(urls: Array[URL]): Future[Seq[Option[Image]]] =
+  def requestImages(urls: Array[String]): Future[Seq[Option[Image]]] =
     Future.collect(urls map requestImage)
 }

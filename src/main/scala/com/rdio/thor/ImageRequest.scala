@@ -2,7 +2,6 @@ package com.rdio.thor
 
 import java.awt.{Color, Font, GraphicsEnvironment}
 import java.io.{File, FileInputStream}
-import java.net.URL
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
@@ -28,7 +27,7 @@ import org.jboss.netty.buffer.ChannelBuffers
 // Encapsulates state involved in processing an image request
 class ImageRequest(
   layers: List[LayerNode],
-  fetchedImages: Map[URL, Image], // Images fetched
+  fetchedImages: Map[String, Image], // Images fetched
   requestWidth: Option[Int],
   requestHeight: Option[Int]
 ) {

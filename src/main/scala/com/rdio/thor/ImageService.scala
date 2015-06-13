@@ -2,7 +2,6 @@ package com.rdio.thor
 
 import java.awt.{Color, Font, GraphicsEnvironment}
 import java.io.{File, FileInputStream}
-import java.net.URL
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
@@ -29,7 +28,7 @@ class ImageService(conf: Config, clients: Map[String, Service[Request, Response]
 
   protected def requestFactory(
     layers: List[LayerNode],
-    fetchedImages: Map[URL, Image],
+    fetchedImages: Map[String, Image],
     requestWidth: Option[Int],
     requestHeight: Option[Int]
   ) = new ImageRequest(layers, fetchedImages, requestWidth, requestHeight)
@@ -45,7 +44,7 @@ class ImageService(conf: Config, clients: Map[String, Service[Request, Response]
     (getDimension(w), getDimension(h))
 
   // Extract all urls from layers
-  def extractUrls(layers: List[LayerNode]): List[URL] = {
+  def extractUrls(layers: List[LayerNode]): List[String] = {
     layers flatMap {
       case LayerNode(url, GridNode(urls)) => url +: urls
       case LayerNode(url, MaskNode(overlay, mask)) => url +: List(overlay, mask)
@@ -58,7 +57,7 @@ class ImageService(conf: Config, clients: Map[String, Service[Request, Response]
   }
 
   // Build a map of paths to images (removing empty paths)
-  def buildImageMap(paths: Array[URL], potentialImages: Array[Option[Image]]): Map[URL, Image] =
+  def buildImageMap(paths: Array[String], potentialImages: Array[Option[Image]]): Map[String, Image] =
     (paths zip potentialImages).toMap.collect({
       case (path, Some(image)) => path -> image
     })
