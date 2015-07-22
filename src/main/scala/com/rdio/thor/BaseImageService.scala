@@ -1,14 +1,14 @@
 package com.rdio.thor
 
 import java.awt.Color
-import java.io.{File, FileInputStream}
+import java.io.{File, FileInputStream, ByteArrayOutputStream}
 import java.net.InetSocketAddress
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
 
-import com.sksamuel.scrimage.{Format, Image, ImageTools, ScaleMethod}
-import com.sksamuel.scrimage.io.{ImageWriter, JpegWriter, PngWriter}
+import com.sksamuel.scrimage.{Format, Image, ScaleMethod}
+import com.sksamuel.scrimage.nio.{ImageWriter, JpegWriter, PngWriter, GifWriter}
 import com.sksamuel.scrimage.filter.{ColorizeFilter, BlurFilter}
 
 import com.twitter.conversions.time._
@@ -25,7 +25,7 @@ import org.jboss.netty.buffer.ChannelBuffers
 /** BaseImageService provides common functionality for requesting and serving images. */
 object BaseImageService {
 
-  def getContentType[T <: ImageWriter](format: Format[T]): String = format match {
+  def getContentType(format: Format): String = format match {
     case Format.JPEG => "image/jpeg"
     case Format.PNG => "image/png"
     case Format.GIF => "image/gif"
@@ -40,12 +40,15 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
 
   protected lazy val log = Logger.get(this.getClass)
 
-  def buildResponse[T <: ImageWriter](req: Request, image: Image, format: Format[T], compression: Int = 98): Response = {
-    val bytes = format match {
-      case Format.JPEG => image.writer(format).withCompression(compression).withProgressive(true).write()
-      case Format.PNG => image.writer(format).withMaxCompression.write()
-      case Format.GIF => image.writer(format).withProgressive(true).write()
+  def buildResponse(req: Request, image: Image, format: Format, compression: Int = 98): Response = {
+    val buffer = new ByteArrayOutputStream()
+    val writer = format match {
+      case Format.JPEG => JpegWriter(compression, true)
+      case Format.PNG => PngWriter.MaxCompression
+      case Format.GIF => GifWriter(true)
     }
+    writer.write(image, buffer)
+    val bytes = buffer.toByteArray()
 
     val expires: Calendar = Calendar.getInstance()
     expires.add(Calendar.DATE, cacheDays)
@@ -71,7 +74,7 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
     client(req) map {
       res => res.status match {
         case Status.Ok => {
-          Some(res.withInputStream[Image](inputStream => Image(inputStream)))
+          Some(res.withInputStream[Image](inputStream => Image.fromStream(inputStream)))
         }
         case _ => {
           log.error(s"Could not fetch: $url (${res.status})")

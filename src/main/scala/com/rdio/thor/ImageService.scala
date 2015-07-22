@@ -7,8 +7,7 @@ import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
 
-import com.sksamuel.scrimage.{Format, Image, ImageTools, ScaleMethod}
-import com.sksamuel.scrimage.io.{ImageWriter, JpegWriter, PngWriter}
+import com.sksamuel.scrimage.{Format, Image, ScaleMethod}
 import com.sksamuel.scrimage.filter.{ColorizeFilter, BlurFilter}
 
 import com.twitter.conversions.time._
@@ -64,11 +63,11 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
     })
 
   // Converts a string format to a Format instance
-  def getFormatter(format: Option[String]): Format[ImageWriter] = {
+  def getFormatter(format: Option[String]): Format = {
     format match {
-      case Some("png") => Format.PNG.asInstanceOf[Format[ImageWriter]]
-      case Some("gif") => Format.GIF.asInstanceOf[Format[ImageWriter]]
-      case _ => Format.JPEG.asInstanceOf[Format[ImageWriter]]
+      case Some("png") => Format.PNG
+      case Some("gif") => Format.GIF
+      case _ => Format.JPEG
     }
   }
 

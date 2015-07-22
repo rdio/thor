@@ -15,9 +15,9 @@ class ImageFiltersSpec extends BaseSpec {
     val filter = new LinearGradientFilter(0, colors, stops)
     val img = Image.filled(10, 10, new Color(0, 0, 255, 100))
     filter(img)
-    val pixel0 = new Pixel(img.pixels(0))
-    val pixel50 = new Pixel(img.pixels(45))
-    val pixel99 = new Pixel(img.pixels(99))
+    val pixel0 = img.pixels(0)
+    val pixel50 = img.pixels(45)
+    val pixel99 = img.pixels(99)
 
     // shows the base image
     pixel0.red should be (0)
@@ -45,7 +45,7 @@ class ImageFiltersSpec extends BaseSpec {
     val filter = new MaskFilter(overlay: Image, mask: Image)
     filter(img)
 
-    var pixel = new Pixel(img.pixels(0))
+    var pixel = img.pixels(0)
 
     pixel.red should be (0)
     pixel.green should be (0)
@@ -60,7 +60,7 @@ class ImageFiltersSpec extends BaseSpec {
     val filter = new MaskFilter(overlay: Image, mask: Image)
     filter(img)
 
-    var pixel = new Pixel(img.pixels(0))
+    var pixel = img.pixels(0)
 
     pixel.red should be (255)
     pixel.green should be (0)
@@ -75,7 +75,7 @@ class ImageFiltersSpec extends BaseSpec {
     val filter = new MaskFilter(overlay: Image, mask: Image)
     filter(img)
 
-    var pixel = new Pixel(img.pixels(0))
+    var pixel = img.pixels(0)
 
     pixel.red should be (28)
     pixel.green should be (0)
@@ -90,7 +90,7 @@ class ImageFiltersSpec extends BaseSpec {
     val filter = new MaskFilter(overlay: Image, mask: Image)
     filter(img)
 
-    var pixel = new Pixel(mask.pixels(0))
+    var pixel = mask.pixels(0)
 
     pixel.red should be (27)
     pixel.green should be (200)
