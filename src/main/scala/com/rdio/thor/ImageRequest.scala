@@ -9,8 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import com.rdio.thor.extensions._
 
-import com.sksamuel.scrimage.{Format, Image, ImageTools, ScaleMethod}
-import com.sksamuel.scrimage.io.{ImageWriter, JpegWriter, PngWriter}
+import com.sksamuel.scrimage.{Format, Image, ScaleMethod}
 import com.sksamuel.scrimage.filter.{ColorizeFilter, BlurFilter}
 
 import com.twitter.conversions.time._

@@ -1,7 +1,6 @@
 package com.rdio.thor
 
 import com.sksamuel.scrimage.{Image, ScaleMethod, Format}
-import com.sksamuel.scrimage.io.{ImageWriter, JpegWriter, PngWriter}
 
 package object extensions {
 
