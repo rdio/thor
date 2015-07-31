@@ -6,6 +6,7 @@ import com.twitter.conversions.time._
 import com.twitter.finagle.Service
 import com.twitter.finagle.builder.{Server, ServerBuilder, ClientBuilder}
 import com.twitter.finagle.http.{Http, RichHttp, Request, Response}
+import com.twitter.finagle.http.service.RoutingService
 
 import com.typesafe.config.{Config, ConfigFactory}
 
