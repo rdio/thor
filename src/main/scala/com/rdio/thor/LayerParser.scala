@@ -510,4 +510,9 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
 
   def namedLayers: List[Parser[Any]] =
     List(layer, layers)
+
+  def getParserName[T <: Parser[Any]](p: T): String = {
+    val s = p.toString
+    s.substring("Parser (".length, s.length-1)
+  }
 }
