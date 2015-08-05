@@ -114,6 +114,7 @@ class ImageRequest(
       } else {
         val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
         val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
+        resourceStream.close()
         font.deriveFont(style, size)
       }
       Some(font)
