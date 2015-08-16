@@ -7,6 +7,7 @@ import com.twitter.finagle.Service
 import com.twitter.finagle.builder.{Server, ServerBuilder, ClientBuilder}
 import com.twitter.finagle.http.{Http, RichHttp, Request, Response}
 import com.twitter.conversions.storage._
+import com.twitter.finagle.http.service.RoutingService
 
 import com.typesafe.config.{Config, ConfigFactory}
 
@@ -17,9 +18,15 @@ import collection.JavaConversions._
 object Thor extends App {
   val conf: Config = ConfigFactory.load()
 
+  val maxResponseSize = if (conf.hasPath("MAX_RESPONSE_SIZE_IN_MB")) {
+    conf.getInt("MAX_RESPONSE_SIZE_IN_MB")
+  } else {
+    2
+  }
+
   val clients = conf.getStringList("IMAGESERVER_ALLOWED_HOSTS").map { (url: String) =>
     (url, ClientBuilder()
-      .codec(RichHttp[Request](Http().maxResponseSize(conf.getInt("MAX_RESPONSE_SIZE_IN_MB").megabytes)))
+      .codec(RichHttp[Request](Http().maxResponseSize(maxResponseSize.megabytes)))
       .hosts(url)
       .hostConnectionLimit(conf.getInt("HOST_CONNECTION_LIMIT"))
       .name("thor-client")

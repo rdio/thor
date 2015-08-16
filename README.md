@@ -31,14 +31,12 @@ Querystring Params
     - filter - `<filter-name>([args])` - filter to apply to the current layer or if no source was provided, the previous layer
       - linear gradient - `linear(<angle>, <color-stop>, <color-stop> [, <color-stop>]+)` - applies a linear gradient over the layer at `<angle>` degrees with _at least_ two color stops
         - color stop - `<rgb|rgba> <percentage>%` - supports either rgb or rgba colors
-        - color - `rgb(<r>, <g>, <b>)|rgba(<r>, <g>, <b>, <a>)` — specifies a color with values between 0.0-1.0.
       - blur - `blur()` - blurs the image using a 3x3 convolution kernel
       - [fit](https://github.com/sksamuel/scrimage/blob/master/guide/fit.md) - `fit()` - resizes the layer to the request dimensions so that it is the maximum possible size while maintaining aspect ratio
       - [cover](https://github.com/sksamuel/scrimage/blob/master/guide/cover.md) - `cover()` - resizes the layer to the request dimensions so that it is the minimum size needed without leaving any background visible
-      - text - `text("<text>", font, <rgb|rgba>)` - draws the specified text over the center of the image
-        - text - text string; must be wrapped in double-quotes
-        - font - `<normal|bold|italic> <font-size>px|<font-size>% "<name-string>"` — font declaration
-        - NOTE: The font must be installed locally or copied as a .ttf into the resources folder
+      - text - `text("{{text}}", font, <rgb|rgba>)` - draws the specified text over the center of the image
+      - text (positioned) - `text("{{text}}", font, color, imagePosition|[imagePosition], hAlign, vAlign, fit)`
+      - frame - `frame(length, color)
       - boxblur - `boxblur(<horizontal-radius>px, <vertical-radius>px)|boxblur(<horizontal-radius>%, <vertical-radius>%)` - applies a box blur to the image by `horizontal-radius` and `vertical-radius`
       - scale - `scale(<percent>%)` - resizes the image by `percent`
       - scaleto - `scaleto(<width-pixels>, <height-pixels>)` - resizes the image to the specified dimensions
@@ -48,6 +46,25 @@ Querystring Params
       - colorize - `colorize(<color>)` - overlays the specified `color` over the image
       - overlay - `overlay(<source>)` - overlays the specified `source` over the image
       - mask - `mask(<overlay-source>, <mask-source>)` - blends between the layer and `overlay-source` using `mask-source` as a guide, where white in the mask reveals the overlay and black reveals the layer
+    - other things:
+      - `string :=` <a text string that is wrapped in quotes>
+      - `length := pixels | percent | percentWidth | percentHeight`
+      - `hAlign := "left" | "center" | "right"`
+      - `vAlign := "top" | "center" | "bottom"`
+      - `imagePosition := "centered" | cartesian(percent, percent) | cartesian(pixels, pixels)`
+      - `fit := fromContent|fitted(width: pixels, maxFontSize: int)`
+      - `font := font-style size font-name`
+        - `font-style := "normal" | "bold" | "italic"`
+        - `font-name := string` where the font must be installed locally or copied as a .ttf into the resources folder
+      - `size := pixels | percent`
+      - `pixels := "{{number}}px"`
+      - `percent := "{{number}}%"`
+      - `color := rgb | rgba | hsl | hsla`
+      - `rgb := rgb(<r>, <g>, <b>)` — specifies a color with values between 0.0-1.0.
+      - `rgba := rgba(<r>, <g>, <b>, <a>)`
+      - `hsl := hsl(<h>, <s>, <l>)` - specifies a color with hsl, h with values between 0.0-360.0, and s and l with values between 0.0-1.0.
+      - `hsla := hsla(<h>, <s>, <l>, <a>)`
+
 
 Examples
 ---
@@ -62,6 +79,8 @@ Examples
     2. `img_b.jpg`
     3. `_:linear(0deg, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 1) 100%) # on an empty layer, create a linear gradient that fades from fully transparent black to fully opaque black`
     4. `$0:mask($1, $2) # Blend between layers $0 and $1 using layer $2 as a mask`
+- http://localhost:8080/l=img_a.jpg;$0:frame(16px,rgba(0,0,0,0.75));$1:text("Dooh dee dooh", bold italic 36px "Helvetica", rgb(0.75,0.25,0.25), [cartesian(9%,75%), cartesian(0px,4px)], left, top, fitted(75%,36px))
+  - draws a frame on the image, and draws some text on the image, fitted so that it doesn't exceed 75% of the width:<br />
 
 License
 ---

@@ -8,8 +8,7 @@ import scala.collection.mutable.ArrayBuffer
 
 import com.rdio.thor.extensions._
 
-import com.sksamuel.scrimage.{Format, Image, ImageTools, ScaleMethod}
-import com.sksamuel.scrimage.io.{ImageWriter, JpegWriter, PngWriter}
+import com.sksamuel.scrimage.{Format, Image, ScaleMethod}
 import com.sksamuel.scrimage.filter.{ColorizeFilter, BlurFilter}
 
 import com.twitter.conversions.time._
@@ -96,6 +95,36 @@ class ImageRequest(
     }
   }
 
+  def getFont(font: FontNode, image: Image): Option[Font] = {
+    val ge: GraphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment()
+    val fontFamilies: Array[String] = ge.getAvailableFontFamilyNames()
+    val (family, size, style) = font match {
+      case FontPixelsNode(family, size, style) => {
+        (family, size, style)
+      }
+      case FontPercentNode(family, percentage, style) => {
+        val size: Int = (percentage * math.max(image.width, image.height).toFloat).toInt
+        (family, size, style)
+      }
+    }
+    try {
+      val font: Font = if (fontFamilies.contains(family)) {
+        new Font(family, style, size)
+      } else {
+        val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
+        val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
+        resourceStream.close()
+        font.deriveFont(style, size)
+      }
+      Some(font)
+    } catch {
+      case _: Exception => {
+        log.error(s"Could not find or load font $family")
+        None
+      }
+    }
+  }
+
   def applyFilter(image: Image, filter: FilterNode, completedLayers: Array[Image]): Option[Image] = {
     filter match {
 
@@ -137,46 +166,11 @@ class ImageRequest(
       }
 
       case TextNode(text, font, color) => {
-        font match {
-          case FontNode(family, size, style) => {
-            val ge: GraphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment()
-            val fontFamilies: Array[String] = ge.getAvailableFontFamilyNames()
-            try {
-              val font: Font = if (fontFamilies.contains(family)) {
-                new Font(family, style, size)
-              } else {
-                val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
-                val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
-                font.deriveFont(style, size)
-              }
-              Some(image.filter(TextFilter(text, font, color)))
-            } catch {
-              case _: Exception => None
-            }
-          }
-        }
+        getFont(font, image).map(font => image.filter(TextFilter(text, font, color)))
       }
 
-      case TextPercentNode(text, font, color) => {
-        font match {
-          case FontPercentNode(family, percentage, style) => {
-            val ge: GraphicsEnvironment = GraphicsEnvironment.getLocalGraphicsEnvironment()
-            val fontFamilies: Array[String] = ge.getAvailableFontFamilyNames()
-            val size: Int = (percentage * math.max(image.width, image.height).toFloat).toInt
-            try {
-              val font: Font = if (fontFamilies.contains(family)) {
-                new Font(family, style, size)
-              } else {
-                val resourceStream = getClass.getResourceAsStream(s"/fonts/$family.ttf")
-                val font: Font = Font.createFont(Font.TRUETYPE_FONT, resourceStream)
-                font.deriveFont(style, size)
-              }
-              Some(image.filter(TextFilter(text, font, color)))
-            } catch {
-              case _: Exception => None
-            }
-          }
-        }
+      case TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit) => {
+        getFont(font, image).map(font => image.filter(TextFilter(text, font, color, pos, hAlign, vAlign, fit)))
       }
 
       case ColorizeNode(color) => Some(image.filter(ColorizeFilter(color)))
@@ -265,6 +259,9 @@ class ImageRequest(
           }
         }
       }
+
+      case FrameNode(thickness, color) =>
+        Some(image.filter(FrameFilter(thickness, color)))
 
       case _: NoopNode => Some(image)
     }

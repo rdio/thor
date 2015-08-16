@@ -1,5 +1,7 @@
 package com.rdio.thor
 
+import scala.annotation.tailrec
+
 import java.awt.{Font, FontMetrics, AlphaComposite, Color, Graphics2D, RenderingHints, LinearGradientPaint, MultipleGradientPaint, Rectangle}
 import java.awt.geom.{RoundRectangle2D, AffineTransform, Point2D, Rectangle2D}
 import java.awt.font.{FontRenderContext, GlyphVector}
@@ -47,34 +49,169 @@ object LinearGradientFilter {
     new LinearGradientFilter(angle, colors, stops)
 }
 
-/** Draws the string of a given font in the center of the image */
-class TextFilter(text: String, font: Font, color: Color) extends Filter {
+sealed trait HorizontalAlignment
+sealed trait VerticalAlignment
+case class LeftAlign() extends HorizontalAlignment
+case class CenterAlign() extends HorizontalAlignment with VerticalAlignment
+case class RightAlign() extends HorizontalAlignment
+case class BottomAlign() extends VerticalAlignment
+case class TopAlign() extends VerticalAlignment
+
+sealed trait ImagePosition
+case class Centered() extends ImagePosition
+case class CartesianAbsolute(dx: Int, dy: Int) extends ImagePosition
+case class CartesianRelative(percentX: Float, percentY: Float) extends ImagePosition
+
+sealed trait TextWidth
+case class WidthFromContent() extends TextWidth
+case class WidthFitted(fitTo: Int, maxFontSize: Length) extends TextWidth
+
+sealed trait Length
+case class LengthPercentHeight(percent: Float) extends Length
+case class LengthPercentWidth(percent: Float) extends Length
+case class LengthPercentage(percent: Float) extends Length
+case class LengthPixels(pixels: Int) extends Length
+
+object Length {
+  def toAbsolutePreferWidth(l: Length, image: Image): Int = l match {
+    case LengthPercentHeight(p) => (p * image.height).toInt
+    case LengthPercentWidth(p) => (p * image.width).toInt
+    case LengthPercentage(p) => (p * image.width).toInt
+    case LengthPixels(d) => d
+  }
+
+  def toAbsolutePreferHeight(l: Length, image: Image): Int = l match {
+    case LengthPercentHeight(p) => (p * image.height).toInt
+    case LengthPercentWidth(p) => (p * image.width).toInt
+    case LengthPercentage(p) => (p * image.height).toInt
+    case LengthPixels(d) => d
+  }
+}
+
+/** Draws the string of a given font at the specified position. */
+class TextFilter(
+  text: String, 
+  font: Font, 
+  color: Color,
+  imagePos: List[ImagePosition], // the image positions are additive, so that you could do a relative offset, and then adjust by a few pixels
+  horizontalAlignment: HorizontalAlignment,
+  verticalAlignment: VerticalAlignment,
+  textWidth: TextWidth) extends Filter
+{
   def apply(image: Image) {
     val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-    g2.setFont(font)
     g2.setColor(color)
 
-    val centerX: Int = image.width / 2
-    val centerY: Int = image.height / 2
+    textWidth match {
+      case WidthFromContent() => {
+        g2.setFont(font)
+      }
+      case WidthFitted(fitTo, maxFontSize) => {
+        val maxFontSizeInPixels = Length.toAbsolutePreferWidth(maxFontSize, image)
+        val fontSize = fitTextToWidth(g2, text, fitTo, maxFontSizeInPixels)
+        g2.setFont(font.deriveFont(font.getStyle, fontSize))
+      }
+    }
 
+    val (x,y) = imagePos.map(imagePositionToCoords(image)).reduce((a: (Int,Int), b: (Int,Int)) => (a,b) match {
+      case ((x1,y1), (x2, y2)) => (x1+x2, y1+y2)
+    })
+
+    // if textX or textY are outside the image bounds, then the text bocomes cropped,
+    // but it draws correctly where you'd expect it to. this is the desired behavior,
+    // because what if the designers wanted the text to flow in for artistic effect?
+    val (textX, textY) = align(g2, text, x, y, horizontalAlignment, verticalAlignment)
+    g2.drawString(text, textX, textY)
+    g2.dispose()
+  }
+
+  def imagePositionToCoords(image: Image)(imagePos: ImagePosition): (Int, Int) = imagePos match {
+    case Centered() => (image.width / 2, image.height / 2)
+    case CartesianAbsolute(x,y) => (x,y)
+    case CartesianRelative(percentX, percentY) => ((image.width * percentX).toInt, (image.height * percentY).toInt)
+  }
+
+  def getRectViaFontMetrics(g2: Graphics2D, text: String): Rectangle = {
     val fontMetrics: FontMetrics = g2.getFontMetrics
-    val stringBounds: Rectangle = fontMetrics.getStringBounds(text, g2).getBounds
+    fontMetrics.getStringBounds(text, g2).getBounds
+  }
 
+  def getRectViaGlyphVector(g2: Graphics2D, text: String): Rectangle = {
     val graphicsFont: Font = g2.getFont
     val renderContext: FontRenderContext = g2.getFontRenderContext
     val glyphVector: GlyphVector = graphicsFont.createGlyphVector(renderContext, text)
-    val visualBounds: Rectangle = glyphVector.getVisualBounds().getBounds()
+    glyphVector.getVisualBounds().getBounds()
+  }
 
-    val textX: Int = centerX - stringBounds.width / 2
-    val textY: Int = centerY - visualBounds.height / 2 - visualBounds.y
+  // Lets say you want to add the name of a band to some station image, but you
+  // don't want the text to overflow off the image. This function uses binary
+  // search to find the largest font size that fits within the given width.
+  def fitTextToWidth(g2: Graphics2D, text: String, width: Int, maxFontSize: Int): Int = {
+    val minSize = 4
+    if (getWidthOfText(g2, text, minSize) > width) {
+      // oy...
+      return minSize
+    }
 
-    g2.drawString(text, textX, textY)
+    if (getWidthOfText(g2, text, maxFontSize) <= width) {
+      return maxFontSize
+    }
+
+    @tailrec
+    def search(lo: Int, hi: Int): Int = {
+      val mid = (hi+lo) / 2
+      mid match {
+        case _ if (lo == mid) =>
+          lo
+
+        case _ if (width < getWidthOfText(g2, text, mid)) =>
+          search(lo, mid)
+
+        case _ =>
+          search(mid, hi)
+      }
+    }
+
+    search(minSize, maxFontSize)
+  }
+
+  def getWidthOfText(g2: Graphics2D, text: String, fontSize: Int): Int = {
+    val savedFont = g2.getFont()
+    val test = font.deriveFont(font.getStyle, fontSize)
+    g2.setFont(test)
+    val width = getRectViaFontMetrics(g2, text).width
+    g2.setFont(savedFont)
+
+    width
+  }
+
+  def align(g2: Graphics2D, text: String, x: Int, y: Int, 
+            horizontalAlignment: HorizontalAlignment,
+            verticalAlignment: VerticalAlignment): (Int, Int) = {
+    val stringBounds = getRectViaFontMetrics(g2, text)
+    val visualBounds = getRectViaGlyphVector(g2, text)
+    val textX = horizontalAlignment match {
+      case LeftAlign() => x
+      case CenterAlign() => x - stringBounds.width / 2
+      case RightAlign() => x - stringBounds.width
+    }
+    val textY = verticalAlignment match {
+      case TopAlign() => y - visualBounds.y
+      case CenterAlign() => y - visualBounds.height / 2 - visualBounds.y
+      case BottomAlign() => y - visualBounds.height - visualBounds.y
+    }
+    return (textX, textY)
   }
 }
 
 object TextFilter {
-  def apply(text: String, font: Font, color: Color): Filter = new TextFilter(text, font, color)
+  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition], horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment, textWidth: TextWidth): Filter =
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth)
+  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition], horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment): Filter =
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, WidthFromContent())
+  def apply(text: String, font: Font, color: Color): Filter =
+    new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent())
 }
 
 /** Blends between two images using a mask */
@@ -201,3 +338,20 @@ class GridFilter(images: Array[Image]) extends Filter {
 object GridFilter {
   def apply(images: Array[Image]): Filter = new GridFilter(images)
 }
+
+/** Adds a frame around the edge of the image */
+case class FrameFilter(thickness: Length, color: Color) extends Filter {
+  def apply(image: Image) {
+    val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
+    val verticalThickness = Length.toAbsolutePreferHeight(thickness, image)
+    val horizontalThickness = Length.toAbsolutePreferWidth(thickness, image)
+
+    g2.setColor(color)
+    g2.fillRect(0, 0, image.width, verticalThickness)
+    g2.fillRect(0, verticalThickness, horizontalThickness, image.height-verticalThickness)
+    g2.fillRect(image.width-horizontalThickness, verticalThickness, image.width, image.height-verticalThickness)
+    g2.fillRect(0, image.height-verticalThickness, image.width, image.height)
+    g2.dispose()
+  }
+}
+
