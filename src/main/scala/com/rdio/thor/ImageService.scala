@@ -2,7 +2,6 @@ package com.rdio.thor
 
 import java.awt.{Color, Font, GraphicsEnvironment}
 import java.io.{File, FileInputStream}
-import java.net.InetSocketAddress
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
@@ -22,7 +21,7 @@ import org.jboss.netty.handler.codec.http._
 import org.jboss.netty.buffer.ChannelBuffers
 
 /** ImageService serves images optionally filtered and blended. */
-class ImageService(conf: Config, client: Service[Request, Response]) extends BaseImageService(conf, client) {
+class ImageService(conf: Config, clients: Map[String, Service[Request, Response]]) extends BaseImageService(conf, clients) {
 
   protected def parserFactory(width: Int, height: Int) = new LayerParser(width, height)
 
@@ -43,15 +42,15 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
   def getDimensions(w: Option[Int], h: Option[Int]): Tuple2[Option[Int], Option[Int]] =
     (getDimension(w), getDimension(h))
 
-  // Extract all paths from layers
-  def extractPaths(layers: List[LayerNode]): List[String] = {
+  // Extract all urls from layers
+  def extractUrls(layers: List[LayerNode]): List[String] = {
     layers flatMap {
-      case LayerNode(path, GridNode(paths)) => path +: paths
-      case LayerNode(path, MaskNode(overlay, mask)) => path +: List(overlay, mask)
-      case LayerNode(path, OverlayNode(overlay)) => path +: List(overlay)
-      case LayerNode(path, _: FilterNode) => List(path)
+      case LayerNode(url, GridNode(urls)) => url +: urls
+      case LayerNode(url, MaskNode(overlay, mask)) => url +: List(overlay, mask)
+      case LayerNode(url, OverlayNode(overlay)) => url +: List(overlay)
+      case LayerNode(url, _: FilterNode) => List(url)
     } flatMap {
-      case PathNode(path) => List(path)
+      case UrlNode(url) => List(url)
       case _ => List()
     }
   }
@@ -214,11 +213,11 @@ class ImageService(conf: Config, client: Service[Request, Response]) extends Bas
 
         parser.parseAll(parser.layers, layers) match {
           case parser.Success(layers, _) => {
-            val paths = extractPaths(layers).toArray
+            val urls = extractUrls(layers).toArray
 
-            requestImages(paths) map {
+            requestImages(urls) map {
               potentialImages => {
-                val fetchedImages = buildImageMap(paths, potentialImages.toArray)
+                val fetchedImages = buildImageMap(urls, potentialImages.toArray)
                 val request = requestFactory(layers, fetchedImages, width, height)
 
                 request() match {

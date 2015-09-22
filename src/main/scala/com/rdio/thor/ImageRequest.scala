@@ -2,7 +2,6 @@ package com.rdio.thor
 
 import java.awt.{Color, Font, GraphicsEnvironment}
 import java.io.{File, FileInputStream}
-import java.net.InetSocketAddress
 import java.util.{Calendar, Date}
 
 import scala.collection.mutable.ArrayBuffer
@@ -82,7 +81,7 @@ class ImageRequest(
   def getImage(source: ImageNode, completedLayers: Array[Image]): Option[Image] = {
     source match {
       case IndexNode(index) if index < completedLayers.length => Some(completedLayers(index))
-      case PathNode(path) if fetchedImages.contains(path) => fetchedImages.get(path)
+      case UrlNode(url) if fetchedImages.contains(url) => fetchedImages.get(url)
       case PreviousNode() if completedLayers.nonEmpty => Some(completedLayers.last)
       case EmptyNode() => {
         Some {

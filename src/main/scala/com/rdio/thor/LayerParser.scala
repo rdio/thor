@@ -13,7 +13,7 @@ case class FontPercentNode(family: String = "Helvetica", size: Float = 1.0f, sty
 
 trait ImageNode{}
 case class EmptyNode() extends ImageNode
-case class PathNode(path: String) extends ImageNode
+case class UrlNode(url: String) extends ImageNode
 case class IndexNode(index: Int) extends ImageNode
 case class PreviousNode() extends ImageNode
 
@@ -28,6 +28,8 @@ case class ScaleNode(percentage: Float) extends FilterNode { override def toStri
 case class ZoomNode(percentage: Float) extends FilterNode { override def toString = "zoom" }
 case class ScaleToNode(width: Int, height: Int) extends FilterNode { override def toString = "scaleto" }
 case class TextNode(text: String, font: FontNode, color: Color) extends FilterNode { override def toString = "text" }
+case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode { override def toString = "textpercent" }
+case class GridNode(urls: List[ImageNode]) extends FilterNode { override def toString = "grid" }
 case class TextPositionedNode(
   text: String, 
   font: FontNode, 
@@ -36,7 +38,6 @@ case class TextPositionedNode(
   hAlign: HorizontalAlignment, 
   vAlign: VerticalAlignment, 
   fit: TextWidth) extends FilterNode { override def toString = "textpositioned" }
-case class GridNode(paths: List[ImageNode]) extends FilterNode { override def toString = "grid" }
 case class PadNode(padding: Int) extends FilterNode { override def toString = "pad" }
 case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
 case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
@@ -104,16 +105,11 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     percentOfWidth | percentOfHeight | (percent ^^ (LengthPercentage(_))) | (pixels ^^ (LengthPixels(_)))
   )
 
-  // path - matches a valid url path
-  // e.g. `this-is-an/img.jpg`
-  //
-  // for those unfamiliar with java's regexps,
-  // http://docs.oracle.com/javase/8/docs/api/java/util/regex/Pattern.html
-  // so, `\w` does not mean "match whitespace"
-  def path: Parser[PathNode] = nameParser("<path> := a valid url path to an image, e.g. `this-is-an/img.jp`")(
-    """[\w\-\/\.%]+""".r ^^ {
-      case path => PathNode(path)
-    })
+  // url - matches a valid url
+  def url: Parser[UrlNode] = nameParser("""<url> := a valid url path to an image, either relative or with a domain""")(
+    """(\b((?:https?)://[-a-zA-Z0-9+&@#/%?=~_|!,.]*[-a-zA-Z0-9+&@#/%=~_|])|[\w\-\/\.%]+)""".r ^^ {
+      case url => UrlNode(url)
+  })
 
   // empty - matches an empty image placeholder
   // e.g. `_`
@@ -130,8 +126,8 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     }) 
 
   // source - matches either a path or image placeholder
-  def source: Parser[ImageNode] = nameParser("""<source> := <empty> | <path> | <index>  // represents an image layer""")(
-    empty | path | placeholder
+  def source: Parser[ImageNode] = nameParser("""<source> := <empty> | <url> | <index>  // represents an image layer""")(
+    empty | url | placeholder
   )
 
   // e.g. `bold`
@@ -387,7 +383,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   // grid filter
   def grid: Parser[GridNode] = nameParser("""<grid> := "grid(" <varargs list of source> ")"  // tiles the given list of layers""")(
     "grid(" ~> repsep(source, ",") <~ ")" ^^ {
-      case paths => GridNode(paths)
+      case urls => GridNode(urls)
     })
 
   // text filter
@@ -460,14 +456,14 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     cover | fit |
     colorize | overlay | pad | padpercent | frame
 
-  // Match a path without filters
+  // Match a url without filters
   def sourcelayer = nameParser("sourcelayer")(
     source ^^ ({
       case p => LayerNode(p, NoopNode())
     })
   )
 
-  // Match a path or placeholder with filters
+  // Match a url or placeholder with filters
   def sourcewithfilter = nameParser("sourcewithfilter")(
     source ~ ":" ~ filters ^^ ({
       case p ~ _ ~ f => LayerNode(p, f)
@@ -492,7 +488,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def namedPrimitives: List[Parser[Any]] =
     List(
       number, integer, degrees, percent, pixels, length,
-      empty, path, placeholder, source,
+      empty, url, placeholder, source,
       string,
       fontStyle, fontStyles, font,
       rgba, rgb, hsla, hsl,
