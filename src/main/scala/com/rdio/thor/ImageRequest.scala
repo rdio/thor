@@ -228,10 +228,13 @@ class ImageRequest(
         Some(image.fit(w, h, new Color(0, 0, 0, 0), ScaleMethod.Bicubic))
       }
 
-      case OverlayNode(overlay) => {
+      case OverlayNode(overlay, scaleToFit) => {
         getImage(overlay, completedLayers) match {
-          case Some(overlayImage) => {
-            Some(image.filter(OverlayFilter(overlayImage.condScaleTo(image.width, image.height))))
+          case Some(overlayImage) => scaleToFit match {
+            case true =>
+              Some(image.filter(OverlayFilter(overlayImage.condScaleTo(image.width, image.height))))
+            case false =>
+              Some(image.filter(OverlayFilter(overlayImage)))
           }
           case _ => {
             log.error(s"Failed to apply overlay: $overlay failed to load")

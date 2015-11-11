@@ -47,7 +47,7 @@ class ImageService(conf: Config, clients: Map[String, Service[Request, Response]
     layers flatMap {
       case LayerNode(url, GridNode(urls)) => url +: urls
       case LayerNode(url, MaskNode(overlay, mask)) => url +: List(overlay, mask)
-      case LayerNode(url, OverlayNode(overlay)) => url +: List(overlay)
+      case LayerNode(url, OverlayNode(overlay, _)) => url +: List(overlay)
       case LayerNode(url, _: FilterNode) => List(url)
     } flatMap {
       case UrlNode(url) => List(url)

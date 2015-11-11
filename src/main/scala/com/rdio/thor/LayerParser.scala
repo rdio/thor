@@ -42,7 +42,7 @@ case class PadNode(padding: Int) extends FilterNode { override def toString = "p
 case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
 case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
 case class RoundCornersPercentNode(radius: Float) extends FilterNode { override def toString = "roundcornerspercent" }
-case class OverlayNode(overlay: ImageNode) extends FilterNode { override def toString = "overlay" }
+case class OverlayNode(overlay: ImageNode, scaleToFit: Boolean) extends FilterNode { override def toString = "overlay" }
 case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode { override def toString = "mask" }
 case class CoverNode() extends FilterNode { override def toString = "cover" }
 case class FitNode() extends FilterNode { override def toString = "fit" }
@@ -68,6 +68,19 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
 
     list(a) | singleton
   }
+
+  // matches a named parameter
+  def keyval: Parser[(String, String)] = nameParser("""<keyval> := string = string""")(
+    """\w+""".r ~ "=" ~ """\w+""".r ^^ {
+      case k ~ _ ~ v => (k,v)
+    }
+  )
+
+  def optionalKeyval: Parser[Option[(String,String)]] = nameParser("""<optional_keyval> ?:= , <keyval>""")(
+    (("," ~ keyval)?) ^^ {
+      case None => None
+      case Some(_ ~ kv) => Some(kv)
+    })
 
   // number - matches an integer or floating point number
   // e.g. `3.14159`
@@ -420,10 +433,13 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     })
 
   // overlay filter
-  def overlay: Parser[OverlayNode] = nameParser("""<overlay> := "overlay(" <source> ")"  // overlays the given layer on top of the source""")(
-    "overlay(" ~> source <~ ")" ^^ {
-      case overlay => OverlayNode(overlay)
-    })
+  def overlay: Parser[OverlayNode] = nameParser("""<overlay> := "overlay(" <source> [, fit=true] ")"  // overlays the given layer on top of the source""")({
+    "overlay(" ~> source ~ optionalKeyval <~ ")" ^^ {
+      case overlay ~ None => OverlayNode(overlay, true)
+      case overlay ~ Some(("fit", "true")) => OverlayNode(overlay, true)
+      case overlay ~ Some(("fit", "false")) => OverlayNode(overlay, false)
+      case overlay ~ _ => OverlayNode(overlay, true)
+    }})
 
   // pad filter
   def pad: Parser[PadNode] = nameParser("""<pad> := "pad(" <pixels> ")"  // pads the layer with a transparent border""")(
