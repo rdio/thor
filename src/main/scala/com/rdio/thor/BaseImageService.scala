@@ -4,7 +4,6 @@ import java.awt.Color
 import java.io.{File, FileInputStream, ByteArrayOutputStream}
 import java.net.InetSocketAddress
 import java.util.{Calendar, Date}
-import java.net.URL
 
 import scala.collection.mutable.ArrayBuffer
 
@@ -33,8 +32,10 @@ object BaseImageService {
   }
 }
 
-abstract class BaseImageService(conf: Config, clients: Map[String, Service[Request, Response]]) extends Service[Request, Response] {
+abstract class BaseImageService(conf: Config, client: Service[Request, Response]) extends Service[Request, Response] {
 
+  protected lazy val mediaHost: String = conf.getString("IMAGESERVER_MEDIA_HOST")
+  protected lazy val mediaPort: Int = conf.getInt("IMAGESERVER_MEDIA_PORT")
   protected lazy val cacheDays: Int = conf.getInt("CACHE_DURATION_DAYS")
 
   protected lazy val log = Logger.get(this.getClass)
@@ -65,33 +66,19 @@ abstract class BaseImageService(conf: Config, clients: Map[String, Service[Reque
     res
   }
 
-  def requestImage(urlOrPath: String): Future[Option[Image]] = {
-    val url = if (urlOrPath.startsWith("http")) {
-      new URL(urlOrPath)
-    } else {
-      if (clients.size > 1) {
-        log.error(s"$urlOrPath has no domain and more than one client configured, picking randomly, good luck!")
-      }
-      new URL("http://" + clients.keys.head + "/" + urlOrPath)
-    }
-
-    val req = Request(url.toString())
-    val host = url.getHost() + ":" + (if (url.getPort() == -1) url.getDefaultPort() else url.getPort())
+  def requestImage(url: String): Future[Option[Image]] = {
+    val req = Request("/" + url)
     req.userAgent = "Thor-Imageserver"
-    req.host = host
+    req.host = s"$mediaHost:$mediaPort"
     req.accept = "image/*"
-
-    clients.get(host) match {
-      case None => Future.value(None)
-      case Some(client) => client(req) map {
-        res => res.status match {
-          case Status.Ok => {
-            Some(res.withInputStream[Image](inputStream => Image.fromStream(inputStream)))
-          }
-          case _ => {
-            log.error(s"Could not fetch: $url (${res.status})")
-            None
-          }
+    client(req) map {
+      res => res.status match {
+        case Status.Ok => {
+          Some(res.withInputStream[Image](inputStream => Image.fromStream(inputStream)))
+        }
+        case _ => {
+          log.error(s"Could not fetch: $url (${res.status})")
+          None
         }
       }
     }

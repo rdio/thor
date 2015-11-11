@@ -21,7 +21,7 @@ import org.jboss.netty.handler.codec.http._
 import org.jboss.netty.buffer.ChannelBuffers
 
 /** ImageService serves images optionally filtered and blended. */
-class ImageService(conf: Config, clients: Map[String, Service[Request, Response]]) extends BaseImageService(conf, clients) {
+class ImageService(conf: Config, clients: Service[Request, Response]) extends BaseImageService(conf, clients) {
 
   protected def parserFactory(width: Int, height: Int) = new LayerParser(width, height)
 

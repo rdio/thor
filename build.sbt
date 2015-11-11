@@ -15,7 +15,7 @@ name := "thor"
 
 organization := "com.rdio"
 
-version := "0.2.2"
+version := "0.2.3"
 
 scalaVersion := "2.10.5"
 
