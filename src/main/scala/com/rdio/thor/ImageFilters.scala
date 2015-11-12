@@ -96,7 +96,8 @@ class TextFilter(
   imagePos: List[ImagePosition], // the image positions are additive, so that you could do a relative offset, and then adjust by a few pixels
   horizontalAlignment: HorizontalAlignment,
   verticalAlignment: VerticalAlignment,
-  textWidth: TextWidth) extends Filter
+  textWidth: TextWidth,
+  bgColor: Option[Color]) extends Filter
 {
   def apply(image: Image) {
     val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
@@ -115,7 +116,7 @@ class TextFilter(
     }
 
     val (x,y) = imagePos.map(imagePositionToCoords(image)).reduce((a: (Int,Int), b: (Int,Int)) => (a,b) match {
-      case ((x1,y1), (x2, y2)) => (x1+x2, y1+y2)
+      case ((x1,y1), (x2, y2)) => (x1 + x2, y1 + y2)
     })
 
     // if textX or textY are outside the image bounds, then the text bocomes cropped,
@@ -141,7 +142,7 @@ class TextFilter(
     val graphicsFont: Font = g2.getFont
     val renderContext: FontRenderContext = g2.getFontRenderContext
     val glyphVector: GlyphVector = graphicsFont.createGlyphVector(renderContext, text)
-    glyphVector.getVisualBounds().getBounds()
+    glyphVector.getVisualBounds.getBounds
   }
 
   // Lets say you want to add the name of a band to some station image, but you
@@ -151,33 +152,33 @@ class TextFilter(
     val minSize = 4
     if (getWidthOfText(g2, text, minSize) > width) {
       // oy...
-      return minSize
-    }
+      minSize
 
-    if (getWidthOfText(g2, text, maxFontSize) <= width) {
-      return maxFontSize
-    }
+    } else if (getWidthOfText(g2, text, maxFontSize) <= width) {
+      maxFontSize
 
-    @tailrec
-    def search(lo: Int, hi: Int): Int = {
-      val mid = (hi+lo) / 2
-      mid match {
-        case _ if (lo == mid) =>
-          lo
+    } else {
+      @tailrec
+      def search(lo: Int, hi: Int): Int = {
+        val mid = (hi + lo) / 2
+        mid match {
+          case _ if lo == mid =>
+            lo
 
-        case _ if (width < getWidthOfText(g2, text, mid)) =>
-          search(lo, mid)
+          case _ if width < getWidthOfText(g2, text, mid) =>
+            search(lo, mid)
 
-        case _ =>
-          search(mid, hi)
+          case _ =>
+            search(mid, hi)
+        }
       }
-    }
 
-    search(minSize, maxFontSize)
+      search(minSize, maxFontSize)
+    }
   }
 
   def getWidthOfText(g2: Graphics2D, text: String, fontSize: Int): Int = {
-    val savedFont = g2.getFont()
+    val savedFont = g2.getFont
     val test = font.deriveFont(font.getStyle, fontSize)
     g2.setFont(test)
     val width = getRectViaFontMetrics(g2, text).width
@@ -186,7 +187,7 @@ class TextFilter(
     width
   }
 
-  def align(g2: Graphics2D, text: String, x: Int, y: Int, 
+  def align(g2: Graphics2D, text: String, x: Int, y: Int,
             horizontalAlignment: HorizontalAlignment,
             verticalAlignment: VerticalAlignment): (Int, Int) = {
     val stringBounds = getRectViaFontMetrics(g2, text)
@@ -201,39 +202,45 @@ class TextFilter(
       case CenterAlign() => y - visualBounds.height / 2 - visualBounds.y
       case BottomAlign() => y - visualBounds.height - visualBounds.y
     }
-    return (textX, textY)
+
+    (textX, textY)
   }
 }
 
 object TextFilter {
-  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition], horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment, textWidth: TextWidth): Filter =
-    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth)
-  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition], horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment): Filter =
-    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, WidthFromContent())
+  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition],
+            horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment,
+            textWidth: TextWidth): Filter =
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth, None)
+
+  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition],
+            horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment): Filter =
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, WidthFromContent(), None)
+
   def apply(text: String, font: Font, color: Color): Filter =
-    new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent())
+    new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent(), None)
 }
 
 /** Blends between two images using a mask */
 class MaskFilter(overlay: Image, mask: Image) extends Filter {
   def apply(image: Image) {
-    val imageRaster = image.awt.getRaster()
-    val overlayRaster = overlay.awt.getRaster()
+    val imageRaster = image.awt.getRaster
+    val overlayRaster = overlay.awt.getRaster
 
     // composeThroughMask looks at the opacity of the maskRaster but we're
     // going to translate that from a grayscale version of the mask where
     // white is opacity 100% and black opacity 0%
     // Copying the image so we don't desaturate the actual mask layer
     val maskCopy = mask.copy
-    val maskRaster = maskCopy.awt.getRaster()
+    val maskRaster = maskCopy.awt.getRaster
     var pixels:Array[Double] = null
-    pixels = maskRaster.getPixels(0, 0, maskRaster.getWidth(), maskRaster.getHeight(), pixels)
-    for( i <- 0 until pixels.length by 4) {
+    pixels = maskRaster.getPixels(0, 0, maskRaster.getWidth, maskRaster.getHeight, pixels)
+    for( i <- pixels.indices by 4) {
         // common grayscale equation. See http://www.thewonderoflight.com/articles/definitive-guide-to-bw-conversion/
         val desaturated = pixels(i) * 0.3 + pixels(i + 1) * 0.59 + pixels(i + 2) * 0.11
         pixels.update(i + 3, desaturated)
     }
-    maskRaster.setPixels(0, 0, maskRaster.getWidth(), maskRaster.getHeight(), pixels)
+    maskRaster.setPixels(0, 0, maskRaster.getWidth, maskRaster.getHeight, pixels)
 
     ImageUtils.composeThroughMask(overlayRaster, imageRaster, maskRaster)
   }
