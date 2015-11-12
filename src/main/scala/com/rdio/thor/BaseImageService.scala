@@ -34,8 +34,7 @@ object BaseImageService {
 
 abstract class BaseImageService(conf: Config, client: Service[Request, Response]) extends Service[Request, Response] {
 
-  protected lazy val mediaHost: String = conf.getString("IMAGESERVER_MEDIA_HOST")
-  protected lazy val mediaPort: Int = conf.getInt("IMAGESERVER_MEDIA_PORT")
+  protected lazy val mediaAddr: String = conf.getStringList("IMAGESERVER_ALLOWED_HOSTS").get(0)
   protected lazy val cacheDays: Int = conf.getInt("CACHE_DURATION_DAYS")
 
   protected lazy val log = Logger.get(this.getClass)
@@ -69,7 +68,7 @@ abstract class BaseImageService(conf: Config, client: Service[Request, Response]
   def requestImage(url: String): Future[Option[Image]] = {
     val req = Request("/" + url)
     req.userAgent = "Thor-Imageserver"
-    req.host = s"$mediaHost:$mediaPort"
+    req.host = mediaAddr
     req.accept = "image/*"
     client(req) map {
       res => res.status match {
