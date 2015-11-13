@@ -277,6 +277,47 @@ object TextFilter {
     new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent(), TextOptions.empty)
 }
 
+class FillRectFilter(fillColor: Color, x: Length, y: Length, w: Length, h: Length,
+                     horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment) extends Filter {
+
+  def apply(image: Image) = {
+    val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
+
+    val xOffsetPx = getLength(image, x)
+    val yOffsetPx = getLength(image, y)
+    val widthPx = getLength(image, w)
+    val heightPx = getLength(image, h)
+
+    val xPx = horizontalAlignment match {
+      case LeftAlign() => xOffsetPx
+      case CenterAlign() => xOffsetPx - (widthPx / 2)
+      case RightAlign() => xOffsetPx - widthPx
+    }
+
+    val yPx = verticalAlignment match {
+      case TopAlign() => yOffsetPx
+      case CenterAlign() => yOffsetPx - (heightPx / 2)
+      case RightAlign() => yOffsetPx - heightPx
+    }
+
+    g2.setColor(fillColor)
+    g2.fillRect(xPx, yPx, widthPx, heightPx)
+  }
+
+  def getLength(image: Image, l: Length): Int = l match {
+    case LengthPercentHeight(percent) => (image.height * percent).round
+    case LengthPercentWidth(percent) => (image.width * percent).round
+    case LengthPercentage(percent) => (percent * math.sqrt(image.width * image.width + image.height * image.height)).round.toInt
+    case LengthPixels(px) => px
+  }
+}
+
+object FillRectFilter {
+  def apply(fillColor: Color, x: Length, y: Length, w: Length, h: Length,
+            horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment): FillRectFilter =
+    new FillRectFilter(fillColor, x, y, w, h, horizontalAlignment, verticalAlignment)
+}
+
 /** Blends between two images using a mask */
 class MaskFilter(overlay: Image, mask: Image) extends Filter {
   def apply(image: Image) {

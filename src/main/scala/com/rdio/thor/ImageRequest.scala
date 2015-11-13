@@ -266,6 +266,9 @@ class ImageRequest(
       case FrameNode(thickness, color) =>
         Some(image.filter(FrameFilter(thickness, color)))
 
+      case FillRectNode(color, x, y, width, height, hAlign, vAlign) =>
+        Some(image.filter(FillRectFilter(color, x, y, width, height, hAlign, vAlign)))
+
       case _: NoopNode => Some(image)
     }
   }

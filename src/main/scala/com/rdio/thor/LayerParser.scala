@@ -50,6 +50,14 @@ case class MaskNode(overlay: ImageNode, mask: ImageNode) extends FilterNode { ov
 case class CoverNode() extends FilterNode { override def toString = "cover" }
 case class FitNode() extends FilterNode { override def toString = "fit" }
 case class FrameNode(thickness: Length, color: Color) extends FilterNode { override def toString = "frame" }
+case class FillRectNode(
+  color: Color,
+  x: Length,
+  y: Length,
+  width: Length,
+  height: Length,
+  hAlign: HorizontalAlignment,
+  vAlign: VerticalAlignment) extends FilterNode { override def toString = "frame" }
 
 case class LayerNode(source: ImageNode, filter: FilterNode)
 
@@ -511,6 +519,12 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
       case _ => FitNode()
     })
 
+  // fillrect filter
+  def fillrect: Parser[FillRectNode] = nameParser("""<fillrect> := "fillrect(" <color> "," <x:length>, <y:length>, <width:length>, <height:length>, <hAlign>, <vAlign> ")" """)(
+    "fillrect(" ~> color ~ "," ~ length ~ "," ~ length ~ "," ~ length ~ "," ~ length ~ "," ~ horizontalAlignment ~ "," ~ verticalAlignment <~ ")" ^^ {
+      case fillColor ~ _ ~ x ~ _ ~ y ~ _ ~ w ~ _ ~ h ~ _ ~ hAlign ~ _ ~ vAlign => FillRectNode(fillColor, x, y, w, h, hAlign, vAlign)
+  })
+
   // all filters
   def filters: Parser[FilterNode] =
     text | textPositioned | linear | boxblur | boxblurpercent |
@@ -564,7 +578,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def namedFilters: List[Parser[Any]] = 
     List(
       linear, frame, blur, boxblur, boxblurpercent, colorize, zoom, scale, scaleto, grid, text, textOption, textOptions, textPositioned,
-      round, roundpercent, mask, overlay, pad, padpercent, cover, fit
+      round, roundpercent, mask, overlay, pad, padpercent, cover, fit, fillrect
     )
 
   def namedLayers: List[Parser[Any]] =
