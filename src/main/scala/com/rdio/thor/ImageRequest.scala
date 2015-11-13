@@ -169,8 +169,8 @@ class ImageRequest(
         getFont(font, image).map(font => image.filter(TextFilter(text, font, color)))
       }
 
-      case TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit) => {
-        getFont(font, image).map(font => image.filter(TextFilter(text, font, color, pos, hAlign, vAlign, fit)))
+      case TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit, bgColor) => {
+        getFont(font, image).map(font => image.filter(TextFilter(text, font, color, pos, hAlign, vAlign, fit, bgColor)))
       }
 
       case ColorizeNode(color) => Some(image.filter(ColorizeFilter(color)))

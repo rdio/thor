@@ -5,7 +5,7 @@ import scala.annotation.tailrec
 import java.awt.{Font, FontMetrics, AlphaComposite, Color, Graphics2D, RenderingHints, LinearGradientPaint, MultipleGradientPaint, Rectangle}
 import java.awt.geom.{RoundRectangle2D, AffineTransform, Point2D, Rectangle2D}
 import java.awt.font.{FontRenderContext, GlyphVector}
-import java.awt.image.BufferedImage
+import BaseUtils._
 
 import com.sksamuel.scrimage.{BufferedOpFilter, Filter, Image, ScaleMethod}
 
@@ -88,21 +88,45 @@ object Length {
   }
 }
 
+// auxiliaries for parsing text options
+case class TextOptions(bgColor: Option[Color],
+                       paddingTop: Option[Length],
+                       paddingRight: Option[Length],
+                       paddingBottom: Option[Length],
+                       paddingLeft: Option[Length]
+                      ) {
+
+  def merge(other: TextOptions): TextOptions = {
+    TextOptions(
+      mergeOpt(bgColor, other.bgColor),
+      mergeOpt(paddingTop, other.paddingTop),
+      mergeOpt(paddingRight, other.paddingRight),
+      mergeOpt(paddingBottom, other.paddingBottom),
+      mergeOpt(paddingLeft, other.paddingLeft)
+    )
+  }
+}
+
+
+object TextOptions {
+  val empty: TextOptions = TextOptions(None, None, None, None, None)
+}
+
+
 /** Draws the string of a given font at the specified position. */
 class TextFilter(
-  text: String, 
-  font: Font, 
+  text: String,
+  font: Font,
   color: Color,
   imagePos: List[ImagePosition], // the image positions are additive, so that you could do a relative offset, and then adjust by a few pixels
   horizontalAlignment: HorizontalAlignment,
   verticalAlignment: VerticalAlignment,
   textWidth: TextWidth,
-  bgColor: Option[Color]) extends Filter
+  textOptions: TextOptions) extends Filter
 {
   def apply(image: Image) {
     val g2 = image.awt.getGraphics.asInstanceOf[Graphics2D]
     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON)
-    g2.setColor(color)
 
     textWidth match {
       case WidthFromContent() => {
@@ -122,9 +146,36 @@ class TextFilter(
     // if textX or textY are outside the image bounds, then the text bocomes cropped,
     // but it draws correctly where you'd expect it to. this is the desired behavior,
     // because what if the designers wanted the text to flow in for artistic effect?
-    val (textX, textY) = align(g2, text, x, y, horizontalAlignment, verticalAlignment)
+    val (textX, textY, textWidthPx, textHeightPx, lineHeightPx) = align(g2, text, x, y, horizontalAlignment, verticalAlignment)
+
+    textOptions.bgColor match {
+      case Some(bgColorVal) => {
+        val defaultPadding = (0.618 * lineHeightPx).round.toInt
+        val getLengthFxn = getLength(lineHeightPx, image) _
+        val padTop =    textOptions.paddingTop.map(getLengthFxn).getOrElse(defaultPadding)
+        val padRight =  textOptions.paddingRight.map(getLengthFxn).getOrElse(defaultPadding)
+        val padBottom = textOptions.paddingBottom.map(getLengthFxn).getOrElse(defaultPadding)
+        val padLeft =   textOptions.paddingLeft.map(getLengthFxn).getOrElse(defaultPadding)
+
+        g2.setColor(bgColorVal)
+        g2.fillRect(
+          textX - padLeft,
+          textY - textHeightPx - padTop,
+          textWidthPx + padLeft + padRight,
+          textHeightPx + padTop + padBottom)
+      }
+      case None => ()
+    }
+    g2.setColor(color)
     g2.drawString(text, textX, textY)
     g2.dispose()
+  }
+
+  def getLength(lineHeightPx: Int, image: Image)(l: Length): Int = l match {
+    case LengthPercentHeight(percent) => (image.height * percent).round
+    case LengthPercentWidth(percent) => (image.width * percent).round
+    case LengthPercentage(percent) => (percent * lineHeightPx).round
+    case LengthPixels(px) => px
   }
 
   def imagePositionToCoords(image: Image)(imagePos: ImagePosition): (Int, Int) = imagePos match {
@@ -189,7 +240,7 @@ class TextFilter(
 
   def align(g2: Graphics2D, text: String, x: Int, y: Int,
             horizontalAlignment: HorizontalAlignment,
-            verticalAlignment: VerticalAlignment): (Int, Int) = {
+            verticalAlignment: VerticalAlignment): (Int, Int, Int, Int, Int) = {
     val stringBounds = getRectViaFontMetrics(g2, text)
     val visualBounds = getRectViaGlyphVector(g2, text)
     val textX = horizontalAlignment match {
@@ -203,22 +254,27 @@ class TextFilter(
       case BottomAlign() => y - visualBounds.height - visualBounds.y
     }
 
-    (textX, textY)
+    (textX, textY, stringBounds.width, visualBounds.height, visualBounds.height)
   }
 }
 
 object TextFilter {
   def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition],
             horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment,
+            textWidth: TextWidth, textOptions: TextOptions): Filter =
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth, textOptions)
+
+  def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition],
+            horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment,
             textWidth: TextWidth): Filter =
-    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth, None)
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, textWidth, TextOptions.empty)
 
   def apply(text: String, font: Font, color: Color, imagePos: List[ImagePosition],
             horizontalAlignment: HorizontalAlignment, verticalAlignment: VerticalAlignment): Filter =
-    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, WidthFromContent(), None)
+    new TextFilter(text, font, color, imagePos, horizontalAlignment, verticalAlignment, WidthFromContent(), TextOptions.empty)
 
   def apply(text: String, font: Font, color: Color): Filter =
-    new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent(), None)
+    new TextFilter(text, font, color, List(Centered()), CenterAlign(), CenterAlign(), WidthFromContent(), TextOptions.empty)
 }
 
 /** Blends between two images using a mask */

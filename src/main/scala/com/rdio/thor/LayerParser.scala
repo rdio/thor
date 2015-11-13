@@ -2,6 +2,8 @@ package com.rdio.thor
 
 import java.awt.{Color, Font}
 
+import com.twitter.logging.Logger
+
 import scala.math
 import scala.util.parsing.combinator._
 
@@ -31,13 +33,14 @@ case class TextNode(text: String, font: FontNode, color: Color) extends FilterNo
 case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode { override def toString = "textpercent" }
 case class GridNode(urls: List[ImageNode]) extends FilterNode { override def toString = "grid" }
 case class TextPositionedNode(
-  text: String, 
-  font: FontNode, 
+  text: String,
+  font: FontNode,
   color: Color,
-  pos: List[ImagePosition], 
-  hAlign: HorizontalAlignment, 
-  vAlign: VerticalAlignment, 
-  fit: TextWidth) extends FilterNode { override def toString = "textpositioned" }
+  pos: List[ImagePosition],
+  hAlign: HorizontalAlignment,
+  vAlign: VerticalAlignment,
+  fit: TextWidth,
+  textOptions: TextOptions) extends FilterNode { override def toString = "textpositioned" }
 case class PadNode(padding: Int) extends FilterNode { override def toString = "pad" }
 case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
 case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
@@ -69,17 +72,25 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     list(a) | singleton
   }
 
-  // matches a named parameter
-  def keyval: Parser[(String, String)] = nameParser("""<keyval> := string = string""")(
-    """\w+""".r ~ "=" ~ """\w+""".r ^^ {
-      case k ~ _ ~ v => (k,v)
+  // matches true or false
+  def boolean: Parser[Boolean] = nameParser("""<boolean> := true | false""")(
+    ("true" | "false") ^^ {
+      case "true" => true
+      case "false" => false
     }
   )
 
-  def optionalKeyval: Parser[Option[(String,String)]] = nameParser("""<optional_keyval> ?:= , <keyval>""")(
-    (("," ~ keyval)?) ^^ {
+  // optionalKeyVal - matches a comma, followed by a key-value pair in the form of key=value.
+  // String objects are implicitly converted to Parser[String] objects.
+  def optionalKeyval[T](key: String, p: Parser[T]): Parser[Option[T]] = nameParser("""<optional_keyval(key,<parser>)> ?:= , key=<parser>""")(
+    (("," ~ key ~ "=" ~ p)?) ^^ {
       case None => None
-      case Some(_ ~ kv) => Some(kv)
+      case Some(_ ~ _ ~ _ ~ v) => Some(v)
+    })
+
+  def keyval[T](key: String, p: Parser[T]): Parser[T] = nameParser("""<keyval(key,<parser>)> ?:= key=<parser>""")(
+    key ~ "=" ~ p ^^ {
+      case _ ~ _ ~ v => v
     })
 
   // number - matches an integer or floating point number
@@ -136,7 +147,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   def placeholder: Parser[IndexNode] = nameParser("""<index> := "$" <integer>  // the layer at the given index""")(
     "$" ~ integer ^^ {
       case _ ~ index => IndexNode(index)
-    }) 
+    })
 
   // source - matches either a path or image placeholder
   def source: Parser[ImageNode] = nameParser("""<source> := <empty> | <url> | <index>  // represents an image layer""")(
@@ -159,7 +170,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
 
   // e.g. `"blah"`
   def string: Parser[String] = nameParser("<string> := any quoted string")(
-    stringLiteral ^^ { 
+    stringLiteral ^^ {
       string => string.stripPrefix("\"").stripSuffix("\"")
     })
 
@@ -405,14 +416,52 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
       case text ~ _ ~ font ~ _ ~ color => TextNode(text, font, color)
     })
 
+  def textOption: Parser[TextOptions] = nameParser("""<textOption> := bgColor=<color> | paddingTop=<length> | paddingRight=<length> | paddingBottom=<length> | paddingBottom=<length>""")({
+    val bgColor = keyval("bgColor", color) ^^ {
+      case c => TextOptions(Some(c), None, None, None, None)
+    }
+
+    val paddingTop = keyval("paddingTop", length) ^^ {
+      l => TextOptions(None, Some(l), None, None, None)
+    }
+    val paddingRight = keyval("paddingRight", length) ^^ {
+      l => TextOptions(None, None, Some(l), None, None)
+    }
+    val paddingBottom = keyval("paddingBottom", length) ^^ {
+      l => TextOptions(None, None, None, Some(l), None)
+    }
+    val paddingLeft = keyval("paddingLeft", length) ^^ {
+      l => TextOptions(None, None, None, None, Some(l))
+    }
+
+    bgColor | paddingTop | paddingRight | paddingBottom | paddingLeft
+  })
+
+  def textOptions: Parser[TextOptions] = nameParser("""<textOptions> := options=[<textOption>]""")(
+    "options" ~> "=" ~> "[" ~> repsep(textOption, ",") <~ "]" ^^ {
+      case l => l.reduce((a,b) => a.merge(b))
+    }
+  )
+
+  def maybeSomeTextOptions: Parser[TextOptions] =
+    (("," ~> textOptions)?) ^^ {
+      case None => TextOptions.empty
+      case Some(x) => x
+    }
+
   def textPositioned: Parser[TextPositionedNode] = nameParser(
-    """<text> :=  // draws the text at the given location on the image. imagePositions are additive so that you could, 
+    """<text> :=  // draws the text at the given location on the image. imagePositions are additive so that you could,
            // e.g. place the text 4 pixels below the lower 1/3rd mark on the image, centered horizontally. you
            // can also specify whether the text is left/center/right aligned and top/center/bottom aligned, and
            // you can also specify a maximum width for the text so that it does not overflow.
-           "text(" <string> "," <font> "," <color> "," (<imagePosition>|[<imagePosition>]) "," <hAlign> "," <vAlign> "," <textwidth> ")"  """)(
-    "text(" ~> string ~ "," ~ font ~ "," ~ color ~ "," ~ singletonOrList(imagePosition) ~ "," ~ horizontalAlignment ~ "," ~ verticalAlignment ~ "," ~ textWidth <~ ")" ^^ {
-      case text ~ _ ~ font ~ _ ~ color ~ _ ~ pos ~ _ ~ hAlign ~ _ ~ vAlign ~ _ ~ fit => TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit)
+           "text(" <string> "," <font> "," <color> "," (<imagePosition>|[<imagePosition>]) "," <hAlign> "," <vAlign> "," <textwidth> [optionally: , <textOptions>]")"
+
+           e.g. text("foobar", "Helveticca", hsl(24, 0.3, 0.1), cartesian(25px, 25px), left, bottom, fitted(100px, 36px), options=[bgColor=rgb(0, 0, 0)])
+    """)(
+    "text(" ~> string ~ "," ~ font ~ "," ~ color ~ "," ~ singletonOrList(imagePosition) ~ "," ~ horizontalAlignment ~ "," ~ verticalAlignment ~ "," ~ textWidth ~ maybeSomeTextOptions <~ ")" ^^ {
+      case text ~ _ ~ font ~ _ ~ color ~ _ ~ pos ~ _ ~ hAlign ~ _ ~ vAlign ~ _ ~ fit ~ textOptions => {
+        TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit, textOptions)
+      }
     })
 
   // round filter
@@ -433,12 +482,10 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     })
 
   // overlay filter
-  def overlay: Parser[OverlayNode] = nameParser("""<overlay> := "overlay(" <source> [, fit=true] ")"  // overlays the given layer on top of the source""")({
-    "overlay(" ~> source ~ optionalKeyval <~ ")" ^^ {
-      case overlay ~ None => OverlayNode(overlay, true)
-      case overlay ~ Some(("fit", "true")) => OverlayNode(overlay, true)
-      case overlay ~ Some(("fit", "false")) => OverlayNode(overlay, false)
-      case overlay ~ _ => OverlayNode(overlay, true)
+  def overlay: Parser[OverlayNode] = nameParser("""<overlay> := "overlay(" <source> [optional: fit=<boolean>] ")"  // overlays the given layer on top of the source""")({
+    "overlay(" ~> source ~ optionalKeyval("fit", boolean) <~ ")" ^^ {
+      case overlay ~ None => OverlayNode(overlay, scaleToFit = true)
+      case overlay ~ Some(fit) => OverlayNode(overlay, scaleToFit = fit)
     }})
 
   // pad filter
@@ -503,7 +550,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
 
   def namedPrimitives: List[Parser[Any]] =
     List(
-      number, integer, degrees, percent, pixels, length,
+      number, integer, degrees, boolean, percent, pixels, length,
       empty, url, placeholder, source,
       string,
       fontStyle, fontStyles, font,
@@ -516,7 +563,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
 
   def namedFilters: List[Parser[Any]] = 
     List(
-      linear, frame, blur, boxblur, boxblurpercent, colorize, zoom, scale, scaleto, grid, text, textPositioned, 
+      linear, frame, blur, boxblur, boxblurpercent, colorize, zoom, scale, scaleto, grid, text, textOption, textOptions, textPositioned,
       round, roundpercent, mask, overlay, pad, padpercent, cover, fit
     )
 
