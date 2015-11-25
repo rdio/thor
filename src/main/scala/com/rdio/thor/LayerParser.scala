@@ -33,14 +33,14 @@ case class TextNode(text: String, font: FontNode, color: Color) extends FilterNo
 case class TextPercentNode(text: String, font: FontPercentNode, color: Color) extends FilterNode { override def toString = "textpercent" }
 case class GridNode(urls: List[ImageNode]) extends FilterNode { override def toString = "grid" }
 case class TextPositionedNode(
-  text: String,
-  font: FontNode,
-  color: Color,
-  pos: List[ImagePosition],
-  hAlign: HorizontalAlignment,
-  vAlign: VerticalAlignment,
-  fit: TextWidth,
-  textOptions: TextOptions) extends FilterNode { override def toString = "textpositioned" }
+                               text: String,
+                               font: FontNode,
+                               color: Color,
+                               pos: List[ImagePosition],
+                               hAlign: HorizontalAlignment,
+                               vAlign: VerticalAlignment,
+                               fit: TextFit,
+                               textOptions: TextOptions) extends FilterNode { override def toString = "textpositioned" }
 case class PadNode(padding: Int) extends FilterNode { override def toString = "pad" }
 case class PadPercentNode(padding: Float) extends FilterNode { override def toString = "padpercent" }
 case class RoundCornersNode(radius: Int) extends FilterNode { override def toString = "roundcorners" }
@@ -335,14 +335,18 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
       case "bottom" => BottomAlign()
     })
 
-  def textWidth: Parser[TextWidth] = nameParser("""<textWidth> := "fromContent" | "fitted(" <width:pixels> "," <maxFontSize:length> ")" """)({
-    def fitted: Parser[TextWidth] = "fitted(" ~> pixels ~ "," ~ length <~ ")" ^? {
-      case width ~ _ ~ maxFontSize => WidthFitted(width, maxFontSize).asInstanceOf[TextWidth]
+  def textFit: Parser[TextFit] = nameParser("""<textFit> := "fromContent" | "fitted(" <width:length> "," <maxFontSize:length> ")" | "fittedBox(" <width:length> "," <height:length> "," <maxFontSize:length> ")" """)({
+    def fittedBox: Parser[TextFit] = "fittedBox(" ~> length ~ "," ~ length ~ "," ~ length <~ ")" ^? {
+      case width ~ _ ~ height ~ _~ maxFontSize => WidthAndHeightFitted(width, height, maxFontSize).asInstanceOf[TextFit]
     }
 
-    def fromContent: Parser[TextWidth] = "fromContent" ^^ {_ => WidthFromContent().asInstanceOf[TextWidth] }
+    def fittedWidth: Parser[TextFit] = "fitted(" ~> length ~ "," ~ length <~ ")" ^? {
+      case width ~ _ ~ maxFontSize => WidthFitted(width, maxFontSize).asInstanceOf[TextFit]
+    }
 
-    fitted | fromContent
+    def fromContent: Parser[TextFit] = "fromContent" ^^ { _ => WidthFromContent().asInstanceOf[TextFit] }
+
+    fittedBox | fittedWidth | fromContent
   })
 
   // linear gradient filter
@@ -458,15 +462,15 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
     }
 
   def textPositioned: Parser[TextPositionedNode] = nameParser(
-    """<text> :=  // draws the text at the given location on the image. imagePositions are additive so that you could,
+    """<text> :=  "text(" <string> "," <font> "," <color> "," (<imagePosition>|[<imagePosition>]) "," <hAlign> "," <vAlign> "," <textFit> [optionally: , <textOptions>]")"
+           // draws the text at the given location on the image. imagePositions are additive so that you could,
            // e.g. place the text 4 pixels below the lower 1/3rd mark on the image, centered horizontally. you
            // can also specify whether the text is left/center/right aligned and top/center/bottom aligned, and
            // you can also specify a maximum width for the text so that it does not overflow.
-           "text(" <string> "," <font> "," <color> "," (<imagePosition>|[<imagePosition>]) "," <hAlign> "," <vAlign> "," <textwidth> [optionally: , <textOptions>]")"
 
-           e.g. text("foobar", "Helveticca", hsl(24, 0.3, 0.1), cartesian(25px, 25px), left, bottom, fitted(100px, 36px), options=[bgColor=rgb(0, 0, 0)])
+           e.g. text("foobar", "Helveticca", hsl(24, 0.3, 0.1), cartesian(25px, 25px), left, bottom, fittedBox(240px, 80px, 36px), options=[bgColor=rgb(0, 0, 0), paddingTop=0.5])
     """)(
-    "text(" ~> string ~ "," ~ font ~ "," ~ color ~ "," ~ singletonOrList(imagePosition) ~ "," ~ horizontalAlignment ~ "," ~ verticalAlignment ~ "," ~ textWidth ~ maybeSomeTextOptions <~ ")" ^^ {
+    "text(" ~> string ~ "," ~ font ~ "," ~ color ~ "," ~ singletonOrList(imagePosition) ~ "," ~ horizontalAlignment ~ "," ~ verticalAlignment ~ "," ~ textFit ~ maybeSomeTextOptions <~ ")" ^^ {
       case text ~ _ ~ font ~ _ ~ color ~ _ ~ pos ~ _ ~ hAlign ~ _ ~ vAlign ~ _ ~ fit ~ textOptions => {
         TextPositionedNode(text, font, color, pos, hAlign, vAlign, fit, textOptions)
       }
@@ -572,7 +576,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
       color, colorStop,
       imagePosition,
       horizontalAlignment, verticalAlignment,
-      textWidth
+      textFit
     )
 
   def namedFilters: List[Parser[Any]] = 

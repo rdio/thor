@@ -110,13 +110,13 @@ class FilterParserSpec extends BaseSpec {
       TextOptions(Some(Color.black), None, None, None, None)
     }
     parser.parseAll(parser.textPositioned, "text(\"Hello world!\", bold 16px \"Helvetica\", rgb(0, 0, 0), centered, center, center, fitted(200px, 36px))").get should be {
-      TextPositionedNode("Hello world!", FontPixelsNode("Helvetica", 16, 1), Color.black, List(Centered()), CenterAlign(), CenterAlign(), WidthFitted(200, LengthPixels(36)), TextOptions.empty)
+      TextPositionedNode("Hello world!", FontPixelsNode("Helvetica", 16, 1), Color.black, List(Centered()), CenterAlign(), CenterAlign(), WidthFitted(LengthPixels(200), LengthPixels(36)), TextOptions.empty)
     }
     parser.parseAll(parser.textPositioned, "text(\"Hello world!\", bold 25% \"Helvetica\", rgb(0, 0, 0), cartesian(25px, 25px), left, bottom, fitted(100px, 36px))").get should be {
-      TextPositionedNode("Hello world!", FontPercentNode("Helvetica", 0.25f, 1), Color.black, List(CartesianAbsolute(25,25)), LeftAlign(), BottomAlign(), WidthFitted(100, LengthPixels(36)), TextOptions.empty)
+      TextPositionedNode("Hello world!", FontPercentNode("Helvetica", 0.25f, 1), Color.black, List(CartesianAbsolute(25,25)), LeftAlign(), BottomAlign(), WidthFitted(LengthPixels(100), LengthPixels(36)), TextOptions.empty)
     }
     parser.parseAll(parser.textPositioned, "text(\"Hello world!\", bold 25% \"Helvetica\", rgb(0, 0, 0), cartesian(25px, 25px), left, bottom, fitted(100px, 36px), options=[bgColor=rgb(0, 0, 0)])").get should be {
-      TextPositionedNode("Hello world!", FontPercentNode("Helvetica", 0.25f, 1), Color.black, List(CartesianAbsolute(25,25)), LeftAlign(), BottomAlign(), WidthFitted(100, LengthPixels(36)), TextOptions(Some(Color.black), None, None, None, None))
+      TextPositionedNode("Hello world!", FontPercentNode("Helvetica", 0.25f, 1), Color.black, List(CartesianAbsolute(25,25)), LeftAlign(), BottomAlign(), WidthFitted(LengthPixels(100), LengthPixels(36)), TextOptions(Some(Color.black), None, None, None, None))
     }
     parser.parseAll(parser.textPositioned, "text(\"Hello world!\", bold 25% \"Helvetica\", rgb(0, 0, 0), [cartesian(50%, 61.8%), cartesian(25px, 10px)], right, top, fromContent)").get should be {
       TextPositionedNode("Hello world!", FontPercentNode("Helvetica", 0.25f, 1), Color.black, List(CartesianRelative(0.5f,0.618f), CartesianAbsolute(25,10)), RightAlign(), TopAlign(), WidthFromContent(), TextOptions.empty)

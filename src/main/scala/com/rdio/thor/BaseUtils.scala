@@ -1,5 +1,7 @@
 package com.rdio.thor
 
+import com.sksamuel.scrimage.Image
+
 /**
   * Created by achan on 11/13/15.
   */

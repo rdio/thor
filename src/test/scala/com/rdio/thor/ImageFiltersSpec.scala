@@ -273,6 +273,57 @@ class ImageFiltersSpec extends BaseSpec {
     imageHasStuffInRegion(img, baselineColor, x, y, w, h) && imageDoesntHaveStuffOutsideOfRegion(img, baselineColor, x, y, w, h)
   }
 
+  trait TextUtilsFixture {
+    val font = new Font("Helvetica", Font.PLAIN, 12)
+    val imageColor = com.sksamuel.scrimage.Color.White
+    val textColor = com.sksamuel.scrimage.Color.Black
+    val textBackgroundColor = com.sksamuel.scrimage.Color(255,192,192)
+    val width  = 600
+    val height = 80
+    val blank = Image.filled(width, height, imageColor)
+    val g2 = blank.awt.getGraphics.asInstanceOf[Graphics2D]
+    val lineHeightMultiplier = 1.382f
+    val maxFontSize = 36
+    val text = "zum schreiben, auf zeichnung"
+
+  }
+
+  "TextUtils" should "create line breaks correctly" in {
+    new TextUtilsFixture {
+      TextUtils.breakTextIntoLines(font, g2, text, 600, 80, lineHeightMultiplier, maxFontSize) shouldEqual((36, List((text, 478))))
+      TextUtils.breakTextIntoLines(font, g2, text, 400, 80, lineHeightMultiplier, maxFontSize) shouldEqual((29, List((text, 385))))
+      TextUtils.breakTextIntoLines(font, g2, text, 240, 80, lineHeightMultiplier, maxFontSize) shouldEqual((28, List(("zum schreiben,", 192), ("auf zeichnung", 178))))
+    }
+  }
+
+  it should "layout text in the correct positions" in {
+    new TextUtilsFixture {
+      val (fontSize, lines) = TextUtils.breakTextIntoLines(font, g2, text, 240, 80, lineHeightMultiplier, maxFontSize)
+
+      TextUtils.layoutText(g2, 300, 200, CenterAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 161, 192, 78, List(("zum schreiben,",204,180), ("auf zeichnung",211,219)))
+      TextUtils.layoutText(g2, 300, 200, CenterAlign(), TopAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 200, 192, 78, List(("zum schreiben,",204,200), ("auf zeichnung",211,239)))
+      TextUtils.layoutText(g2, 300, 200, CenterAlign(), BottomAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 122, 192, 78, List(("zum schreiben,",204,161), ("auf zeichnung",211,200)))
+      TextUtils.layoutText(g2, 300, 200, LeftAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(300, 161, 192, 78, List(("zum schreiben,",300,180), ("auf zeichnung",300,219)))
+      TextUtils.layoutText(g2, 300, 200, RightAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(108, 161, 192, 78, List(("zum schreiben,",108,180), ("auf zeichnung",122,219)))
+    }
+  }
+
+  it should "place the background rect in the expected position" in {
+    new TextUtilsFixture {
+      val (fontSize, lines) = TextUtils.breakTextIntoLines(font, g2, text, 240, 80, lineHeightMultiplier, maxFontSize)
+      val (overallX, overallY, overallWidth, overallHeight, linesWithPositions) =
+        TextUtils.layoutText(g2, 300, 200, RightAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier)
+      val textOptions =
+        TextOptions(None,
+          Some(LengthPercentage(0.25f)), // CSS ordering is top, right, bottom, left
+          Some(LengthPercentage(0.25f)),
+          Some(LengthPercentage(0.25f)),
+          Some(LengthPercentage(0.25f)))
+
+      TextUtils.getBackgroundRect(blank, overallX, overallY, overallWidth, overallHeight, fontSize, lineHeightMultiplier, textOptions) shouldEqual ((101, 116, 206, 92))
+    }
+  }
+
   trait TextFilterFixture {
     val font = new Font("Helvetica", Font.PLAIN, 12)
 
@@ -285,14 +336,14 @@ class ImageFiltersSpec extends BaseSpec {
     val imageColor = com.sksamuel.scrimage.Color.White
     val textColor = com.sksamuel.scrimage.Color.Black
     val imagePixel = Pixel(imageColor)
-    val blank = Image.filled(width, height, imageColor)
-    val withText = blank.filter(TextFilter("Testing", font, textColor))    
   }
 
   "TextFilter" should "render text in the correct place (centered position, center horizontal alignment, center vertical alignment)" in {
     new TextFilterFixture {
       val expectedX = width/2 - expectedTextWidth/2
       val expectedY = height/2 - expectedTextHeight/2
+      val blank = Image.filled(width, height, imageColor)
+      val withText = blank.filter(TextFilter("Testing", font, textColor))
 
       imageOnlyHasStuffInRegion(withText, imageColor, expectedX, expectedY, expectedTextWidth, expectedTextHeight)
     }
@@ -302,7 +353,8 @@ class ImageFiltersSpec extends BaseSpec {
     new TextFilterFixture {
       val posX = (0.5).toFloat
       val posY = (0.25).toFloat
-      override val withText = blank.filter(TextFilter("Testing", font, textColor, List(CartesianRelative(posX, posY)), CenterAlign(), TopAlign()))
+      val blank = Image.filled(width, height, imageColor)
+      val withText = blank.filter(TextFilter("Testing", font, textColor, List(CartesianRelative(posX, posY)), CenterAlign(), TopAlign()))
   
       val expectedX = (width * posX) - (expectedTextWidth / 2)
       val expectedY = height * posY
@@ -315,7 +367,8 @@ class ImageFiltersSpec extends BaseSpec {
     new TextFilterFixture {
       val posX = (0.5).toFloat
       val posY = (0.25).toFloat
-      override val withText = blank.filter(TextFilter("Testing", font, textColor, List(CartesianRelative(posX, posY)), CenterAlign(), BottomAlign()))
+      val blank = Image.filled(width, height, imageColor)
+      val withText = blank.filter(TextFilter("Testing", font, textColor, List(CartesianRelative(posX, posY)), CenterAlign(), BottomAlign()))
   
       val expectedX = (width * posX) - (expectedTextWidth / 2)
       val expectedY = height * posY - expectedTextHeight
@@ -329,9 +382,10 @@ class ImageFiltersSpec extends BaseSpec {
       val posX = 10
       val posY = 10
       val testString = "abjsel kfsjdf kldsjk flsdjf lkjouh"
+      val blank = Image.filled(width, height, imageColor)
       override val expectedTextWidth = 200
       override val expectedTextHeight = 36
-      override val withText = blank.filter(TextFilter(testString, font, textColor, List(CartesianAbsolute(posX, posY)), LeftAlign(), TopAlign(), WidthFitted(expectedTextWidth, LengthPixels(expectedTextHeight))))
+      val withText = blank.filter(TextFilter(testString, font, textColor, List(CartesianAbsolute(posX, posY)), LeftAlign(), TopAlign(), WidthFitted(LengthPixels(expectedTextWidth), LengthPixels(expectedTextHeight))))
 
       imageOnlyHasStuffInRegion(withText, imageColor, posX, posY, expectedTextWidth, expectedTextHeight)
     }
@@ -342,11 +396,38 @@ class ImageFiltersSpec extends BaseSpec {
       val posX = 10
       val posY = 10
       val testString = "Oh Hai!"
+      val blank = Image.filled(width, height, imageColor)
       override val expectedTextWidth = 200
       override val expectedTextHeight = 36
-      override val withText = blank.filter(TextFilter(testString, font, textColor, List(CartesianAbsolute(posX, posY)), LeftAlign(), TopAlign(), WidthFitted(expectedTextWidth, LengthPixels(expectedTextHeight))))
+      val withText = blank.filter(TextFilter(testString, font, textColor, List(CartesianAbsolute(posX, posY)), LeftAlign(), TopAlign(), WidthFitted(LengthPixels(expectedTextWidth), LengthPixels(expectedTextHeight))))
 
       imageOnlyHasStuffInRegion(withText, imageColor, posX, posY, expectedTextWidth, expectedTextHeight)
+    }
+  }
+
+  it should "be able to fit text to a given width and height (don't exceed maximum font size)" in {
+    new TextFilterFixture {
+      override val expectedTextWidth = 206
+      override val expectedTextHeight = 92
+
+      override val width  = 600
+      override val height = 400
+      val blank = Image.filled(width, height, imageColor)
+
+      val expectedFontSize = 28
+      val testString = "zum schreiben, auf zeichnung"
+      val textOptions =
+        TextOptions(Some(textColor),
+          Some(LengthPercentage(0.25f)), // CSS ordering is top, right, bottom, left
+          Some(LengthPercentage(0.25f)),
+          Some(LengthPercentage(0.25f)),
+          Some(LengthPercentage(0.25f)))
+
+      val withText =
+        blank.filter(TextFilter(testString, font, textColor, List(CartesianRelative(0.5f, 0.5f)), RightAlign(), CenterAlign(),
+          WidthAndHeightFitted(LengthPixels(240), LengthPixels(80), LengthPixels(expectedFontSize)), textOptions))
+
+      imageOnlyHasStuffInRegion(withText, imageColor, 300, 200, expectedTextWidth, expectedTextHeight)
     }
   }
 }
