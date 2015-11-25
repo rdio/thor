@@ -300,11 +300,11 @@ class ImageFiltersSpec extends BaseSpec {
     new TextUtilsFixture {
       val (fontSize, lines) = TextUtils.breakTextIntoLines(font, g2, text, 240, 80, lineHeightMultiplier, maxFontSize)
 
-      TextUtils.layoutText(g2, 300, 200, CenterAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 161, 192, 78, List(("zum schreiben,",204,180), ("auf zeichnung",211,219)))
+      TextUtils.layoutText(g2, 300, 200, CenterAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 161, 192, 78, List(("zum schreiben,",204,161), ("auf zeichnung",211,200)))
       TextUtils.layoutText(g2, 300, 200, CenterAlign(), TopAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 200, 192, 78, List(("zum schreiben,",204,200), ("auf zeichnung",211,239)))
-      TextUtils.layoutText(g2, 300, 200, CenterAlign(), BottomAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 122, 192, 78, List(("zum schreiben,",204,161), ("auf zeichnung",211,200)))
-      TextUtils.layoutText(g2, 300, 200, LeftAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(300, 161, 192, 78, List(("zum schreiben,",300,180), ("auf zeichnung",300,219)))
-      TextUtils.layoutText(g2, 300, 200, RightAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(108, 161, 192, 78, List(("zum schreiben,",108,180), ("auf zeichnung",122,219)))
+      TextUtils.layoutText(g2, 300, 200, CenterAlign(), BottomAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(204, 122, 192, 78, List(("zum schreiben,",204,122), ("auf zeichnung",211,161)))
+      TextUtils.layoutText(g2, 300, 200, LeftAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(300, 161, 192, 78, List(("zum schreiben,",300,161), ("auf zeichnung",300,200)))
+      TextUtils.layoutText(g2, 300, 200, RightAlign(), CenterAlign(), lines, fontSize, lineHeightMultiplier) shouldEqual(108, 161, 192, 78, List(("zum schreiben,",108,161), ("auf zeichnung",122,200)))
     }
   }
 

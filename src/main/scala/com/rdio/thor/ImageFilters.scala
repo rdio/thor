@@ -153,10 +153,6 @@ object TextUtils {
 
     val overallWidth = lines.map({ case (l, width) => width }).max
     val overallHeight = Math.ceil(lineHeight * fontSize * lines.length).toInt
-    val alignmentFxn: (((String,Int), Int)) => (String, Int, Int) = alignWithBounds(x, y, horizontalAlignment, verticalAlignment, fontSize, lineHeight)
-    val linesWithIndices: List[((String,Int), Int)] = lines.zipWithIndex
-    val linesWithPositions = linesWithIndices.map(alignmentFxn)
-
     val overallX = horizontalAlignment match {
       case LeftAlign() => x
       case CenterAlign() => x - overallWidth / 2
@@ -167,6 +163,10 @@ object TextUtils {
       case CenterAlign() => y - overallHeight / 2 // - visualBounds.y
       case BottomAlign() => y - overallHeight // - visualBounds.y
     }
+
+    val alignmentFxn: (((String,Int), Int)) => (String, Int, Int) = alignWithBounds(x, overallY, horizontalAlignment, verticalAlignment, fontSize, lineHeight)
+    val linesWithIndices: List[((String,Int), Int)] = lines.zipWithIndex
+    val linesWithPositions = linesWithIndices.map(alignmentFxn)
 
     (overallX, overallY, overallWidth, overallHeight, linesWithPositions)
   }
@@ -185,13 +185,14 @@ object TextUtils {
         case RightAlign() => x - width
       }
       val yOffset = Math.round(y + height * lineNumber)
+      /*
       val textY = verticalAlignment match {
         case TopAlign() => yOffset // - visualBounds.y
         case CenterAlign() => yOffset - height / 2 // - visualBounds.y
         case BottomAlign() => yOffset - height // - visualBounds.y
-      }
+      }*/
 
-      (line, textX, textY.toInt)
+      (line, textX, yOffset)
     }
   }
 
@@ -657,8 +658,8 @@ case class FrameFilter(thickness: Length, color: Color) extends Filter {
 
     g2.setColor(color)
     g2.fillRect(0, 0, image.width, verticalThickness)
-    g2.fillRect(0, verticalThickness, horizontalThickness, image.height-verticalThickness)
-    g2.fillRect(image.width-horizontalThickness, verticalThickness, image.width, image.height-verticalThickness)
+    g2.fillRect(0, verticalThickness, horizontalThickness, image.height-verticalThickness*2)
+    g2.fillRect(image.width-horizontalThickness, verticalThickness, image.width, image.height-verticalThickness*2)
     g2.fillRect(0, image.height-verticalThickness, image.width, image.height)
     g2.dispose()
   }

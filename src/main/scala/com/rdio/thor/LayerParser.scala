@@ -110,7 +110,7 @@ class LayerParser(requestWidth: Int, requestHeight: Int) extends JavaTokenParser
   // integer - matches an integer
   // e.g. `42`
   def integer: Parser[Int] = nameParser("""<integer> := any integer""")(
-    """\d+""".r ^^ (_.toInt)
+    """[-]?\d+""".r ^^ (_.toInt)
   )
 
   // degrees - matches a numerical degree
