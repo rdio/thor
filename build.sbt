@@ -8,7 +8,7 @@ mainClass in assembly := Some("com.rdio.thor.Thor")
 
 excludedJars in assembly := {
   val cp = (fullClasspath in assembly).value
-  cp filter {_.data.getName == "scalatest_2.10-1.9.1.jar"}
+  cp filter {_.data.getName == "scalatest_2.10-2.1.3.jar"}
 }
 
 name := "thor"
@@ -19,7 +19,7 @@ version := "0.2.3"
 
 scalaVersion := "2.10.5"
 
-sbtVersion := "0.13.8"
+sbtVersion := "0.13.9"
 
 scalacOptions ++= Seq(
   "-deprecation",
